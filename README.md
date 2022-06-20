@@ -63,9 +63,9 @@ contents:
 ```java
 package com.example;
 
-import com.google.cloud.functions.HttpFunction;
-import com.google.cloud.functions.HttpRequest;
-import com.google.cloud.functions.HttpResponse;
+import HttpFunction;
+import HttpRequest;
+import HttpResponse;
 
 public class HelloWorld implements HttpFunction {
   @Override
@@ -93,8 +93,8 @@ contents:
 ```java
 package com.example;
 
-import com.google.cloud.functions.Context;
-import com.google.cloud.functions.RawBackgroundFunction;
+import Context;
+import RawBackgroundFunction;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import java.util.logging.Logger;
@@ -120,8 +120,8 @@ contents:
 ```java
 package com.example;
 
-import com.google.cloud.functions.BackgroundFunction;
-import com.google.cloud.functions.Context;
+import BackgroundFunction;
+import Context;
 import java.util.Map;
 import java.util.logging.Logger;
 

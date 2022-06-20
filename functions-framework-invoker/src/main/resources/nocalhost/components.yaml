@@ -1,0 +1,26 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: cron-input
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+    - name: schedule
+      value: "@every 2s"
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: msg
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "kafka-server-kafka-brokers:9092"
+    - name: consumerGroup
+      value: "group1"
+    - name: authRequired
+      value: "false"
