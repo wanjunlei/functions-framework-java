@@ -16,11 +16,11 @@ limitations under the License.
 
 package dev.openfunction.samples;
 
-import dev.openfunction.functions.AsyncFunction;
+import dev.openfunction.functions.OpenFunction;
 import dev.openfunction.functions.Context;
 import dev.openfunction.functions.Out;
 
-public class AsyncFunctionImpl implements AsyncFunction {
+public class OpenFunctionImpl implements OpenFunction {
 
     @Override
     public Out accept(Context context, String payload) throws Exception {

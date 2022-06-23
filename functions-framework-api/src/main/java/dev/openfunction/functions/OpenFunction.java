@@ -17,11 +17,11 @@ limitations under the License.
 package dev.openfunction.functions;
 
 @FunctionalInterface
-public interface AsyncFunction {
+public interface OpenFunction {
 
   /**
    * Called to service an incoming event. This interface is implemented by user code to provide the
-   * action for a given asynchronous function.
+   * action for a given function.
    *
    * @param context context
    * @param payload incoming event

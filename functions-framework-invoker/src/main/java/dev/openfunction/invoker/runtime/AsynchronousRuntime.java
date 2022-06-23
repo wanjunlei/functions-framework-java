@@ -43,27 +43,27 @@ public final class AsynchronousRuntime implements Runtime {
 
     private RuntimeContext runtimeContext;
 
-    private final AsyncFunction function;
+    private final OpenFunction function;
 
     private final Service service;
 
-    private AsynchronousRuntime(AsyncFunction function) {
+    private AsynchronousRuntime(OpenFunction function) {
         this.function = function;
         service = new Service();
     }
 
     public static AsynchronousRuntime forClass(Class<?> functionClass) {
-        if (!AsyncFunction.class.isAssignableFrom(functionClass)) {
+        if (!OpenFunction.class.isAssignableFrom(functionClass)) {
             throw new RuntimeException(
                     "Class "
                             + functionClass.getName()
                             + " does not implement "
-                            + HttpFunction.class.getName());
+                            + OpenFunction.class.getName());
         }
 
         try {
-            Class<? extends AsyncFunction> asyncHttpFunctionClass = functionClass.asSubclass(AsyncFunction.class);
-            return new AsynchronousRuntime(asyncHttpFunctionClass.getConstructor().newInstance());
+            Class<? extends OpenFunction> openFunctionClass = functionClass.asSubclass(OpenFunction.class);
+            return new AsynchronousRuntime(openFunctionClass.getConstructor().newInstance());
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(
                     "Could not construct an instance of " + functionClass.getName(), e);

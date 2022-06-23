@@ -16,7 +16,7 @@ spec:
   build:
     builder: openfunctiondev/builder-java:v2-11
     env:
-      FUNC_NAME: "dev.openfunction.samples.AsyncFunctionImpl"
+      FUNC_NAME: "dev.openfunction.samples.OpenFunctionImpl"
       FUNC_CLEAR_SOURCE: "true"
     srcRepo:
       url: "https://github.com/wanjunlei/functions-framework-java.git"

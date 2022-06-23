@@ -17,7 +17,7 @@ spec:
   build:
     builder: openfunctiondev/builder-java:v2-17
     env:
-      FUNC_NAME: "dev.openfunction.samples.HttpFunctionImpl"
+      FUNC_NAME: "dev.openfunction.samples.OpenFunctionImpl"
       FUNC_CLEAR_SOURCE: "true"
     srcRepo:
       url: "https://github.com/wanjunlei/functions-framework-java.git"

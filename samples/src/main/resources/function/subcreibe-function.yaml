@@ -16,7 +16,7 @@ spec:
   build:
     builder: openfunctiondev/builder-java:v2-16
     env:
-      FUNC_NAME: "dev.openfunction.samples.AsyncFunctionImpl"
+      FUNC_NAME: "dev.openfunction.samples.OpenFunctionImpl"
       FUNC_CLEAR_SOURCE: "true"
       # Use FUNC_GOPROXY to set the goproxy
       # FUNC_GOPROXY: "https://goproxy.cn"

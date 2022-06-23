@@ -16,9 +16,9 @@ limitations under the License.
 
 package dev.openfunction.invoker.runtime;
 
-import dev.openfunction.functions.AsyncFunction;
 import dev.openfunction.functions.CloudEventFunction;
 import dev.openfunction.functions.HttpFunction;
+import dev.openfunction.functions.OpenFunction;
 import dev.openfunction.functions.Out;
 import dev.openfunction.invoker.context.RuntimeContext;
 import dev.openfunction.invoker.context.UserContext;
@@ -54,7 +54,7 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
 
     private CloudEventFunction cloudEventFunction;
 
-    private AsyncFunction asyncFunction;
+    private OpenFunction openFunction;
 
     private RuntimeContext runtimeContext;
 
@@ -69,17 +69,14 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
         EventFormatProvider.getInstance().registerFormat(new JsonEventFormat());
     }
 
-    private SynchronizeRuntime(AsyncFunction asyncFunction) {
-        this.asyncFunction = asyncFunction;
-        daprClient = new DaprClientBuilder().build();
-        daprClient.waitForSidecar(WaitDaprSidecarTimeout);
+    private SynchronizeRuntime(OpenFunction openFunction) {
+        this.openFunction = openFunction;
     }
 
     /**
      * Makes a {@link SynchronizeRuntime} for the given class.
      *
      * @param functionClass function class
-     *
      * @return {@link SynchronizeRuntime}
      */
     public static SynchronizeRuntime forClass(Class<?> functionClass) {
@@ -93,10 +90,10 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
                 Class<? extends CloudEventFunction> cloudEventFunctionClass = functionClass.asSubclass(CloudEventFunction.class);
                 CloudEventFunction cloudEventFunction = cloudEventFunctionClass.getConstructor().newInstance();
                 return new SynchronizeRuntime(cloudEventFunction);
-            } else if (AsyncFunction.class.isAssignableFrom(functionClass)) {
-                Class<? extends AsyncFunction> asyncFunctionClass = functionClass.asSubclass(AsyncFunction.class);
-                AsyncFunction asyncFunction = asyncFunctionClass.getConstructor().newInstance();
-                return new SynchronizeRuntime(asyncFunction);
+            } else if (OpenFunction.class.isAssignableFrom(functionClass)) {
+                Class<? extends OpenFunction> asyncFunctionClass = functionClass.asSubclass(OpenFunction.class);
+                OpenFunction openFunction = asyncFunctionClass.getConstructor().newInstance();
+                return new SynchronizeRuntime(openFunction);
             }
         } catch (ReflectiveOperationException e) {
             throw new Error("Could not construct an instance of " + functionClass.getName(), e);
@@ -151,9 +148,9 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
                 }
 
                 respImpl.getOutputStream().write(userContext.getOut().getData().array());
-            } else if (asyncFunction != null) {
+            } else if (openFunction != null) {
                 userContext.executePrePlugins();
-                Out out = asyncFunction.accept(userContext, Arrays.toString(reqImpl.getInputStream().readAllBytes()));
+                Out out = openFunction.accept(userContext, Arrays.toString(reqImpl.getInputStream().readAllBytes()));
                 userContext.setOut(out);
                 userContext.executePostPlugins();
 
@@ -196,6 +193,12 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
     public void start(RuntimeContext ctx) throws Exception {
 
         runtimeContext = ctx;
+        // create dapr client when dapr sidecar enabled.
+        if (System.getenv("DAPR_GRPC_PORT") != null || System.getenv("DAPR_HTTP_PORT") != null) {
+            daprClient = new DaprClientBuilder().build();
+            daprClient.waitForSidecar(Runtime.WaitDaprSidecarTimeout);
+        }
+
         Server server = new Server(ctx.getPort());
 
         ServletContextHandler servletContextHandler = new ServletContextHandler();
