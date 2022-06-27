@@ -1,0 +1,54 @@
+# This is the runtime configuration which stored in K8s cluster. Modifications
+# to the development configuration will take effect the next time you enter
+# the DevMode, and modification will share with all those who use this cluster.
+#
+# If you want to customized personal configuration, you can create a configuration
+# file named config.yaml in the root directory of your project under the
+# folder .nocalhost (/.nocalhost/config.yaml). It will become part of your
+# project, you can easily share configuration with other developers, or
+# develop on any other devices using this personal configuration.
+#
+# Tips: You can paste the configuration follow into
+# /root/IdeaProjects/functions-framework-java/functions-framework-invoker/.nocalhost/config.yaml
+#
+# In addition, if you want to config multi service in same config.yaml, or use
+# the Server-version of Nocalhost, you can also configure under the definition
+# of the application, such as:
+# https://nocalhost.dev/docs/config/config-deployment-quickstart
+#
+name: sample-java
+serviceType: deployment
+containers:
+  - name: function
+    dev:
+      gitUrl: ""
+      image: nocalhost-docker.pkg.coding.net/nocalhost/dev-images/java:11
+      shell: ""
+      workDir: ""
+      storageClass: ""
+      resources: null
+      persistentVolumeDirs: []
+      command:
+        run:
+          - ./src/main/resources/nocalhost/run.sh
+        debug:
+          - ./src/main/resources/nocalhost/debug.sh
+      debug:
+        remoteDebugPort: 5005
+        language: java
+      hotReload: false
+      sync:
+        type: send
+        filePattern: []
+        ignoreFilePattern: []
+      env:
+        - name: FUNCTION_TARGET
+          value: dev.openfunction.samples.AsyncFunctionImpl
+        - name: FUNC_CONTEXT
+          value: "{\"name\":\"sample-binding\",\"version\":\"v2.0.0\",\"inputs\":{\"cron\":{\"uri\":\"cron\",\"componentName\":\"cron-input\",\"componentType\":\"bindings.cron\"}},\"outputs\":{\"sample\":{\"uri\":\"sample-topic\",\"componentName\":\"msg\",\"componentType\":\"bindings.kafka\",}},\"runtime\":\"Async\",\"port\":\"8080\",\"prePlugins\":[\"dev.openfunction.samples.plugins.ExamplePlugin\"],\"postPlugins\":[\"dev.openfunction.samples.plugins.ExamplePlugin\"]}"
+          #value: "{\"name\":\"sample-pubsub\",\"version\":\"v2.0.0\",\"inputs\":{\"sub\":{\"uri\":\"sample-topic\",\"componentName\":\"msg\",\"componentType\":\"pubsub.kafka\"}},\"outputs\":{},\"runtime\":\"Async\",\"port\":\"8080\",\"prePlugins\":[\"dev.openfunction.samples.plugin.ExamplePlugin\"],\"postPlugins\":[\"dev.openfunction.samples.plugin.ExamplePlugin\"]}"
+      portForward: []
+      patches:
+        - patch: '{"spec":{"template":{"metadata":{"annotations":{"dapr.io/app-id":"cron-input-kafka-output-default", "dapr.io/app-port": "8080", "dapr.io/app-protocol":"grpc","dapr.io/enabled":"true","dapr.io/log-as-json": "true","dapr.io/log-level":"debug"}}}}}'
+          type: strategic
+
