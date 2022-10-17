@@ -113,6 +113,10 @@ public class RuntimeContext {
     private Map<String, Plugin> loadPlugins(ClassLoader classLoader, String[] pluginNames) {
         Map<String, Plugin> plugins = new HashMap<>();
 
+        if (pluginNames == null) {
+            return plugins;
+        }
+
         for (String name : pluginNames) {
             if (Objects.equals(name, TracingSkywalking)) {
                 plugins.put(TracingSkywalking, tracingPlugin);
