@@ -14,16 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dev.openfunction.functions;
+package dev.openfunction.samples;
 
-import io.cloudevents.CloudEvent;
+import dev.openfunction.functions.HttpFunction;
+import dev.openfunction.functions.HttpRequest;
+import dev.openfunction.functions.HttpResponse;
+import dev.openfunction.functions.Routable;
 
-public interface CloudEventFunction {
-    /**
-     * @param ctx   Context
-     * @param event cloud event
-     * @return Error
-     * @throws Exception Exception
-     */
-    Error accept(Context ctx, CloudEvent event) throws Exception;
+public class HelloOpenFunction extends Routable implements HttpFunction {
+
+    @Override
+    public void service(HttpRequest request, HttpResponse response) throws Exception {
+
+        response.getWriter().write("Hello OpenFunction");
+    }
+
+    @Override
+    public String getPath(){
+        return "/openfunction";
+    }
 }
+

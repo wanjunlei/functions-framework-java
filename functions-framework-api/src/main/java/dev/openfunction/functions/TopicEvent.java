@@ -19,7 +19,6 @@ package dev.openfunction.functions;
 import java.nio.ByteBuffer;
 
 public class TopicEvent {
-
     /**
      * The name of the pubsub the publisher sent to.
      */

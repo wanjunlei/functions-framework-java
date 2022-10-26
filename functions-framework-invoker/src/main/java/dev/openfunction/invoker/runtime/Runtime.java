@@ -16,13 +16,11 @@ limitations under the License.
 
 package dev.openfunction.invoker.runtime;
 
-import dev.openfunction.invoker.context.RuntimeContext;
-
 public interface Runtime {
 
     int WaitDaprSidecarTimeout = 60000;
 
-    void start(RuntimeContext ctx) throws Exception;
+    void start() throws Exception;
 
     void close();
 }

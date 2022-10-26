@@ -17,7 +17,6 @@ limitations under the License.
 package dev.openfunction.functions;
 
 public interface Plugin {
-
     /**
      * name return the name of this plugin.
      *
@@ -44,7 +43,7 @@ public interface Plugin {
     /**
      * execPreHook executes a hook before the function called.
      *
-     * @param ctx     Runtime context
+     * @param ctx Runtime context
      * @return error
      */
     Error execPreHook(Context ctx);
@@ -52,7 +51,7 @@ public interface Plugin {
     /**
      * execPreHook executes a hook after the function called.
      *
-     * @param ctx     Runtime context
+     * @param ctx Runtime context
      * @return error
      */
     Error execPostHook(Context ctx);

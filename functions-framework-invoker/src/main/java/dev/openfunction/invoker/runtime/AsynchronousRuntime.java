@@ -16,7 +16,6 @@ limitations under the License.
 
 package dev.openfunction.invoker.runtime;
 
-import com.google.protobuf.TextFormat;
 import dev.openfunction.functions.*;
 import dev.openfunction.invoker.context.RuntimeContext;
 import dev.openfunction.invoker.context.UserContext;
@@ -41,47 +40,41 @@ public final class AsynchronousRuntime implements Runtime {
 
     private static final Logger logger = Logger.getLogger("dev.openfunction.invoker");
 
-    private RuntimeContext runtimeContext;
+    private final RuntimeContext runtimeContext;
 
-    private final OpenFunction function;
+    private final ArrayList<OpenFunction> functions;
 
     private final Service service;
 
-    private AsynchronousRuntime(OpenFunction function) {
-        this.function = function;
+    public AsynchronousRuntime(RuntimeContext runtimeContext, Class<?>[] functionClasses) {
+        this.runtimeContext = runtimeContext;
+
+        functions = new ArrayList<>();
+        for (Class<?> c : functionClasses) {
+            if (!OpenFunction.class.isAssignableFrom(c)) {
+                throw new Error("Unsupported function " + c.getName());
+            }
+
+            try {
+                Class<? extends OpenFunction> openFunctionClass = c.asSubclass(OpenFunction.class);
+                functions.add(openFunctionClass.getConstructor().newInstance());
+            } catch (ReflectiveOperationException e) {
+                throw new Error("Could not construct an instance of " + c.getName(), e);
+            }
+        }
+
         service = new Service();
     }
 
-    public static AsynchronousRuntime forClass(Class<?> functionClass) {
-        if (!OpenFunction.class.isAssignableFrom(functionClass)) {
-            throw new RuntimeException(
-                    "Class "
-                            + functionClass.getName()
-                            + " does not implement "
-                            + OpenFunction.class.getName());
-        }
-
-        try {
-            Class<? extends OpenFunction> openFunctionClass = functionClass.asSubclass(OpenFunction.class);
-            return new AsynchronousRuntime(openFunctionClass.getConstructor().newInstance());
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException(
-                    "Could not construct an instance of " + functionClass.getName(), e);
-        }
-    }
-
     @Override
-    public void start(RuntimeContext ctx) throws Exception {
-
-        AsynchronousRuntime.this.runtimeContext = ctx;
-
-        Map<String, Component> inputs = ctx.getInputs();
+    public void start() throws Exception {
+        Map<String, Component> inputs = runtimeContext.getInputs();
 
         if (inputs == null || inputs.isEmpty()) {
             throw new Error("no inputs defined for the function");
         }
 
-        this.service.start(ctx.getPort());
+        this.service.start(runtimeContext.getPort());
     }
 
     @Override
@@ -135,15 +128,17 @@ public final class AsynchronousRuntime implements Runtime {
         public void onBindingEvent(DaprAppCallbackProtos.BindingEventRequest request,
                                    StreamObserver<DaprAppCallbackProtos.BindingEventResponse> responseObserver) {
             try {
-                BindingEvent event = new BindingEvent(request.getName(), request.getMetadataMap(), request.getData().asReadOnlyByteBuffer());
-                UserContext userContext = new UserContext(runtimeContext, daprClient, event);
+                for (OpenFunction function : functions) {
+                    BindingEvent event = new BindingEvent(request.getName(), request.getMetadataMap(), request.getData().asReadOnlyByteBuffer());
+                    UserContext userContext = new UserContext(runtimeContext, daprClient, event);
 
-                userContext.executePrePlugins();
-                Out out = function.accept(userContext, TextFormat.escapeBytes(request.getData()));
-                userContext.setOut(out);
-                userContext.executePostPlugins();
+                    userContext.executePrePlugins();
+                    Out out = function.accept(userContext, request.getData().toStringUtf8());
+                    userContext.setOut(out);
+                    userContext.executePostPlugins();
 
-                responseObserver.onNext(DaprAppCallbackProtos.BindingEventResponse.getDefaultInstance());
+                    responseObserver.onNext(DaprAppCallbackProtos.BindingEventResponse.getDefaultInstance());
+                }
             } catch (Exception e) {
                 logger.log(Level.INFO, "catch exception when execute function " + runtimeContext.getName());
                 e.printStackTrace();
@@ -171,21 +166,23 @@ public final class AsynchronousRuntime implements Runtime {
         public void onTopicEvent(io.dapr.v1.DaprAppCallbackProtos.TopicEventRequest request,
                                  io.grpc.stub.StreamObserver<io.dapr.v1.DaprAppCallbackProtos.TopicEventResponse> responseObserver) {
             try {
-                TopicEvent event = new TopicEvent(request.getPubsubName(),
-                        request.getId(),
-                        request.getTopic(),
-                        request.getSpecVersion(),
-                        request.getSource(),
-                        request.getType(),
-                        request.getDataContentType(),
-                        request.getData().asReadOnlyByteBuffer());
-                UserContext userContext = new UserContext(runtimeContext, daprClient, event);
-                userContext.executePrePlugins();
-                Out out = function.accept(userContext, TextFormat.escapeBytes(request.getData()));
-                userContext.setOut(out);
-                userContext.executePostPlugins();
+                for (OpenFunction function: functions) {
+                    TopicEvent event = new TopicEvent(request.getPubsubName(),
+                            request.getId(),
+                            request.getTopic(),
+                            request.getSpecVersion(),
+                            request.getSource(),
+                            request.getType(),
+                            request.getDataContentType(),
+                            request.getData().asReadOnlyByteBuffer());
+                    UserContext userContext = new UserContext(runtimeContext, daprClient, event);
+                    userContext.executePrePlugins();
+                    Out out = function.accept(userContext, request.getData().toStringUtf8());
+                    userContext.setOut(out);
+                    userContext.executePostPlugins();
 
-                responseObserver.onNext(DaprAppCallbackProtos.TopicEventResponse.getDefaultInstance());
+                    responseObserver.onNext(DaprAppCallbackProtos.TopicEventResponse.getDefaultInstance());
+                }
             } catch (Exception e) {
                 logger.log(Level.INFO, "catch exception when execute function " + runtimeContext.getName());
                 e.printStackTrace();

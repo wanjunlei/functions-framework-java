@@ -31,10 +31,7 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -68,20 +65,30 @@ public class Runner {
             RuntimeContext runtimeContext = new RuntimeContext(functionContext, functionClassLoader);
 
             Runtime runtime;
-            Class<?> functionClass = functionClassLoader.loadClass(target);
+            Class<?>[] functionClasses = loadTargets(target, functionClassLoader);
             if (Objects.equals(runtimeContext.getRuntime(), SyncRuntime)) {
-                runtime = SynchronizeRuntime.forClass(functionClass);
+                runtime = new SynchronizeRuntime(runtimeContext, functionClasses);
             } else if (Objects.equals(runtimeContext.getRuntime(), AsyncRuntime)) {
-                runtime = AsynchronousRuntime.forClass(functionClass);
+                runtime = new AsynchronousRuntime(runtimeContext, functionClasses);
             } else {
                 throw new Exception("Unknown runtime");
             }
 
-            runtime.start(runtimeContext);
+            runtime.start();
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Failed to run function", e);
             e.printStackTrace();
         }
+    }
+
+    private static Class<?>[] loadTargets(String target, ClassLoader functionClassLoader) throws ClassNotFoundException {
+        String[] targets = target.split(",");
+        Class<?>[] classes = new Class<?>[targets.length];
+        for (int i=0; i < targets.length; i++) {
+            classes[i] = functionClassLoader.loadClass(targets[i]);
+        }
+
+        return classes;
     }
 
     static URL[] classpathToUrls(String classpath) {

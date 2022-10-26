@@ -16,17 +16,15 @@ limitations under the License.
 
 package dev.openfunction.functions;
 
-@FunctionalInterface
 public interface OpenFunction {
-
-  /**
-   * Called to service an incoming event. This interface is implemented by user code to provide the
-   * action for a given function.
-   *
-   * @param context context
-   * @param payload incoming event
-   * @return Out
-   * @throws Exception Exception
-   */
-  Out accept(Context context, String payload) throws Exception;
+    /**
+     * Called to service an incoming event. This interface is implemented by user code to provide the
+     * action for a given function.
+     *
+     * @param context context
+     * @param payload incoming event
+     * @return Out
+     * @throws Exception Exception
+     */
+    Out accept(Context context, String payload) throws Exception;
 }

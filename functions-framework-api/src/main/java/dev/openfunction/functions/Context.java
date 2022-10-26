@@ -24,7 +24,6 @@ import java.util.Map;
  * An interface for event function context.
  */
 public interface Context {
-
     /**
      * send provides the ability to allow the user to send data to a specified output target.
      *

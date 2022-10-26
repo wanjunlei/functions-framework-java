@@ -23,6 +23,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class ExamplePlugin implements Plugin {
+    private int seq = 0;
+
     @Override
     public String name() {
         return "plugin-example";
@@ -53,18 +55,19 @@ public class ExamplePlugin implements Plugin {
     private void execHook(Context ctx, String type) {
         String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.XXX").format(new Date());
         if (ctx.getBindingEvent() != null) {
-            System.out.printf("plugin %s:%s exec %s hook for binding %s at %s", name(), version(), type, ctx.getBindingEvent().getName(), ts).println();
+            System.out.printf("plugin %s:%s exec %s hook for binding %s at %s, seq %d", name(), version(), type, ctx.getBindingEvent().getName(), ts, seq).println();
         } else if (ctx.getTopicEvent() != null) {
-            System.out.printf("plugin %s:%s exec %s hook for pubsub %s at %s", name(), version(), type, ctx.getTopicEvent().getName(), ts).println();
+            System.out.printf("plugin %s:%s exec %s hook for pubsub %s at %s, seq %d", name(), version(), type, ctx.getTopicEvent().getName(), ts, seq).println();
         } else if (ctx.getHttpRequest() != null) {
             if (ctx.getCloudEvent() != null) {
-                System.out.printf("plugin %s:%s exec %s hook for cloudevent function at %s", name(), version(), type, ts).println();
+                System.out.printf("plugin %s:%s exec %s hook for cloudevent function at %s, seq %d", name(), version(), type, ts, seq).println();
             } else {
-                System.out.printf("plugin %s:%s exec %s hook for http function at %s", name(), version(), type, ts).println();
+                System.out.printf("plugin %s:%s exec %s hook for http function at %s, seq %d", name(), version(), type, ts, seq).println();
             }
-        } else  {
-           System.out.println("unknown function type");
+        } else {
+            System.out.println("unknown function type");
         }
+        seq++;
     }
 
     @Override
