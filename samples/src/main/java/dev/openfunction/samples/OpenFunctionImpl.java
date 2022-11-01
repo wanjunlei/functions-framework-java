@@ -24,7 +24,7 @@ public class OpenFunctionImpl implements OpenFunction {
 
     @Override
     public Out accept(Context context, String payload) throws Exception {
-        System.out.println("receive event: " + payload);
+        System.out.printf("receive event: %s", payload).println();
 
         if (context.getOutputs() != null) {
             for (String key : context.getOutputs().keySet()) {

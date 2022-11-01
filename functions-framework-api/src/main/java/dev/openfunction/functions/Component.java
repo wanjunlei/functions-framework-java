@@ -19,12 +19,11 @@ package dev.openfunction.functions;
 import java.util.Map;
 
 public class Component {
-
     private String uri;
     private String componentName;
     private String componentType;
     private Map<String, String> metadata;
-    private String Operation;
+    private String operation;
 
 
     public String getUri() {
@@ -60,11 +59,11 @@ public class Component {
     }
 
     public String getOperation() {
-        return Operation;
+        return operation;
     }
 
     public void setOperation(String operation) {
-        Operation = operation;
+        this.operation = operation;
     }
 }
 

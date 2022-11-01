@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 
 public class BindingEvent {
-
     /**
      * The name of the input binding component.
      */

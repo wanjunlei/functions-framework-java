@@ -102,7 +102,7 @@ public class UserContext implements Context {
 
         Component output = outputs.get(outputName);
         if (output == null) {
-            return new Error("output " + outputName +" not found");
+            return new Error("output " + outputName + " not found");
         }
 
         String payload = data;
@@ -110,11 +110,12 @@ public class UserContext implements Context {
         if (isTraceable(output.getComponentType())) {
         }
 
-        switch (output.getComponentType()) {
-            case OpenFuncTopic:
-                daprClient.publishEvent(output.getComponentName(), output.getUri(), payload);
-            case OpenFuncBinding:
-                daprClient.invokeBinding(output.getComponentName(), output.getOperation(), payload, output.getMetadata(), String.class);
+        if (output.getComponentType().startsWith(OpenFuncTopic)) {
+            daprClient.publishEvent(output.getComponentName(), output.getUri(), payload);
+        } else if (output.getComponentType().startsWith(OpenFuncBinding)) {
+            daprClient.invokeBinding(output.getComponentName(), output.getOperation(), payload.getBytes(), output.getMetadata()).block();
+        } else {
+            return new Error("unknown output type " + output.getComponentType());
         }
 
         return null;

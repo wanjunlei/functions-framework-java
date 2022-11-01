@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 
 public class Out {
-
     /**
      * code is return code of the user function
      */
