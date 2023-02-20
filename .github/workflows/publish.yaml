@@ -2,7 +2,7 @@ name: Maven Publish
 on:
   push:
     branches:
-      - 'main'
+      - 'master'
     tags:
       - '*'
     paths:
