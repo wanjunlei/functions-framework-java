@@ -169,7 +169,6 @@ class FunctionContext {
     }
 
     public boolean isTracingEnabled() {
-
         return pluginsTracing != null && pluginsTracing.isEnabled();
     }
 

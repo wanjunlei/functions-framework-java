@@ -23,7 +23,6 @@ import java.util.Map;
 
 public class SkywalkingPlugin implements Plugin {
 
-    private static final String Name    = "skywalking";
     private static final String Version = "v1";
 
     /**
@@ -31,19 +30,19 @@ public class SkywalkingPlugin implements Plugin {
      */
     private static final int componentIDOpenFunction = 5013;
 
-    private String oapServer;
-    private Map<String, String> tags;
-    private Map<String, String> baggage;
+    private final String name;
+    private final Map<String, String> tags;
+    private final Map<String, String> baggage;
 
-    public SkywalkingPlugin(String oapServer, Map<String, String> tags, Map<String, String> baggage) {
-        this.oapServer = oapServer;
+    public SkywalkingPlugin(String name, Map<String, String> tags, Map<String, String> baggage) {
+        this.name = name;
         this.tags = tags;
         this.baggage = baggage;
     }
 
     @Override
     public String name() {
-        return Name;
+        return name;
     }
 
     @Override

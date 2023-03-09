@@ -227,7 +227,6 @@ public class UserContext implements Context {
     }
 
     public void executePrePlugins() {
-
         for (String name : getPrePlugins().keySet()) {
             Plugin plugin = getPrePlugins().get(name);
             Error error = plugin.execPreHook(this);

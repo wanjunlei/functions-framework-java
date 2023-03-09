@@ -20,6 +20,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.openfunction.functions.Component;
 import dev.openfunction.functions.Plugin;
+import dev.openfunction.invoker.plugins.OpenTelemetryPlugin;
 import dev.openfunction.invoker.plugins.SkywalkingPlugin;
 import kotlin.Pair;
 import org.eclipse.jetty.util.ArrayUtil;
@@ -44,7 +45,7 @@ public class RuntimeContext {
     private static final String TracingOpentelemetry = "opentelemetry";
 
     private final FunctionContext functionContext;
-    private  String mode;
+    private String mode;
     private final int port;
     private String pod;
     private String namespace;
@@ -88,22 +89,25 @@ public class RuntimeContext {
         String[] postPluginNames = ArrayUtil.add(functionContext.getPostPlugins(), null);
 
         if (functionContext.isTracingEnabled()) {
-
             Pair<String, String> provider = functionContext.getTracingProvider();
             String providerName = provider.component1();
             if (!Objects.equals(providerName, TracingSkywalking) && !Objects.equals(providerName, TracingOpentelemetry)) {
-                throw new IllegalArgumentException("unknown tracing provider " + provider);
+                throw new IllegalArgumentException("unsupported tracing provider " + provider);
             }
 
             prePluginNames = ArrayUtil.addToArray(prePluginNames, providerName, String.class);
             postPluginNames = ArrayUtil.addToArray(postPluginNames, providerName, String.class);
 
             Map<String, String> tags = functionContext.getTracingTags();
-            tags.put("func", functionContext.getName());
             tags.put("instance", pod);
             tags.put("namespace", namespace);
 
-            tracingPlugin = new SkywalkingPlugin(provider.component2(), tags, functionContext.getTracingBaggage());
+            switch (providerName) {
+                case TracingSkywalking:
+                    tracingPlugin = new SkywalkingPlugin(providerName, tags, functionContext.getTracingBaggage());
+                case TracingOpentelemetry:
+                    tracingPlugin = new OpenTelemetryPlugin(providerName, tags, functionContext.getTracingBaggage());
+            }
         }
 
         prePlugins = loadPlugins(classLoader, prePluginNames);
@@ -128,7 +132,7 @@ public class RuntimeContext {
                 Class<? extends Plugin> pluginImplClass = pluginClass.asSubclass(Plugin.class);
                 plugins.put(name, pluginImplClass.getConstructor().newInstance());
             } catch (Exception e) {
-                logger.log(Level.WARNING, "load plugin " + name +" error, " + e.getMessage());
+                logger.log(Level.WARNING, "load plugin " + name + " error, " + e.getMessage());
                 e.printStackTrace();
             }
         }
