@@ -33,7 +33,7 @@ public interface Plugin {
 
     /**
      * init will create a new plugin, and execute hook in this calling.
-     * If you do not want to use a new plugin to execute hook, just return `nil`.
+     * If you do not want to use a new plugin to execute hook, just return `this`.
      *
      * @return Plugin
      */
