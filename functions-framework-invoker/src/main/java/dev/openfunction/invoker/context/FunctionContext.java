@@ -17,9 +17,7 @@ limitations under the License.
 package dev.openfunction.invoker.context;
 
 import dev.openfunction.functions.Component;
-import kotlin.Pair;
 
-import java.util.HashMap;
 import java.util.Map;
 
 class FunctionContext {
@@ -107,84 +105,7 @@ class FunctionContext {
         this.pluginsTracing = pluginsTracing;
     }
 
-    class TracingConfig {
-
-        private boolean enabled;
-        private TracingProvider provider;
-        private Map<String, String> tags;
-        private Map<String, String> baggage;
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public TracingProvider getProvider() {
-            return provider;
-        }
-
-        public void setProvider(TracingProvider provider) {
-            this.provider = provider;
-        }
-
-        public Map<String, String> getTags() {
-            return tags;
-        }
-
-        public void setTags(Map<String, String> tags) {
-            this.tags = tags;
-        }
-
-        public Map<String, String> getBaggage() {
-            return baggage;
-        }
-
-        public void setBaggage(Map<String, String> baggage) {
-            this.baggage = baggage;
-        }
-
-        private class TracingProvider {
-            private String Name;
-            private String oapServer;
-
-            public String getName() {
-                return Name;
-            }
-
-            public void setName(String name) {
-                Name = name;
-            }
-
-            public String getOapServer() {
-                return oapServer;
-            }
-
-            public void setOapServer(String oapServer) {
-                this.oapServer = oapServer;
-            }
-        }
-    }
-
     public boolean isTracingEnabled() {
-
         return pluginsTracing != null && pluginsTracing.isEnabled();
-    }
-
-    public Pair<String, String> getTracingProvider() {
-        if (pluginsTracing.provider == null) {
-            return new Pair<>("", "");
-        }
-        return new Pair<>(getPluginsTracing().provider.getName(), getPluginsTracing().provider.getOapServer());
-    }
-
-    public Map<String, String> getTracingTags() {
-        return pluginsTracing == null ? new HashMap<>() : getPluginsTracing().getTags();
-    }
-
-    public Map<String, String> getTracingBaggage() {
-        return pluginsTracing == null ? new HashMap<>() : getPluginsTracing().getBaggage();
     }
 }

@@ -76,25 +76,11 @@ public interface Context {
     String getName();
 
     /**
-     * getMode returns the operating environment mode of the function.
-     *
-     * @return Mode
-     */
-    String getMode();
-
-    /**
      * GetOut returns the returned value of function.
      *
      * @return Out
      */
     Out getOut();
-
-    /**
-     * getRuntime returns the Runtime.
-     *
-     * @return String
-     */
-    String getRuntime();
 
     /**
      * getHttpPattern returns the path of the server listening for http function.
@@ -103,42 +89,10 @@ public interface Context {
      */
     String getHttpPattern();
 
-
-    /**
-     * getInputs returns the Inputs of function.
-     *
-     * @return Inputs
-     */
-    Map<String, Component> getInputs();
-
     /**
      * getOutputs returns the Outputs of function.
      *
      * @return Outputs
      */
     Map<String, Component> getOutputs();
-
-    /**
-     * getPodName returns the name of the pod the function is running on.
-     *
-     * @return name of pod
-     */
-    String getPodName();
-
-    /**
-     * getPodNamespace returns the namespace of the pod the function is running on.
-     *
-     * @return namespace of pod
-     */
-    String getPodNamespace();
-
-    /**
-     * @return pre plugins
-     */
-    Map<String, Plugin> getPrePlugins();
-
-    /**
-     * @return post plugin
-     */
-    Map<String, Plugin> getPostPlugins();
 }

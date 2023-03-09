@@ -17,11 +17,15 @@ limitations under the License.
 package dev.openfunction.invoker.context;
 
 import dev.openfunction.functions.*;
+import dev.openfunction.invoker.Callback;
+import dev.openfunction.invoker.runtime.JsonEventFormat;
 import io.cloudevents.CloudEvent;
+import io.cloudevents.core.v03.CloudEventBuilder;
 import io.dapr.client.DaprClient;
+import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.net.URI;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -29,26 +33,22 @@ public class UserContext implements Context {
 
     private static final Logger logger = Logger.getLogger("dev.openfunction.invoker");
 
-    private static final Map<String, Boolean> bindingQueueComponents = Map.of(
-            "bindings.kafka", true,
-            "bindings.rabbitmq", true,
-            "bindings.aws.sqs", true,
-            "bindings.aws.kinesis", true,
-            "bindings.gcp.pubsub", true,
-            "bindings.azure.eventgrid", true,
-            "bindings.azure.eventhubs", true,
-            "bindings.azure.servicebusqueues", true,
-            "bindings.azure.storagequeues", true
-    );
-
     public static final String OpenFuncBinding = "bindings";
     public static final String OpenFuncTopic = "pubsub";
 
-    private RuntimeContext runtimeContext;
-    private DaprClient daprClient;
+    private static final Set<String> MiddlewaresCloudEventFormatReqired = Set.of(
+            "kafka",
+            "kubemq",
+            "mqtt3",
+            "rabbitmq",
+            "redis",
+            "gcp.pubsub",
+            "azure.eventhubs"
+    );
 
-    private Map<String, Plugin> prePlugins;
-    private Map<String, Plugin> postPlugins;
+    private final RuntimeContext runtimeContext;
+    private final DaprClient daprClient;
+
     private Out out;
 
     private BindingEvent bindingEvent;
@@ -58,43 +58,34 @@ public class UserContext implements Context {
     private HttpRequest httpRequest;
     private HttpResponse httpResponse;
 
-    public UserContext(RuntimeContext runtimeContext, DaprClient daprClient, BindingEvent event) {
-        init(runtimeContext, daprClient);
-        this.bindingEvent = event;
+    private Object function;
+
+    public UserContext(RuntimeContext runtimeContext, DaprClient daprClient) {
+        this.runtimeContext = runtimeContext;
+        this.daprClient = daprClient;
     }
 
-    public UserContext(RuntimeContext runtimeContext, DaprClient daprClient, TopicEvent event) {
-        init(runtimeContext, daprClient);
-        this.topicEvent = event;
-    }
-
-    public UserContext(RuntimeContext runtimeContext, DaprClient daprClient, HttpRequest httpRequest, HttpResponse httpResponse) {
-        init(runtimeContext, daprClient);
+    public UserContext withHttp(HttpRequest httpRequest, HttpResponse httpResponse) {
         this.httpRequest = httpRequest;
         this.httpResponse = httpResponse;
+        return this;
     }
 
-    private void init(RuntimeContext runtimeContext, DaprClient daprClient) {
-        this.runtimeContext = runtimeContext;
+    public UserContext withBindingEvent(BindingEvent event) {
+        this.bindingEvent = event;
+        return this;
+    }
 
-        Map<String, Plugin> plugins = new HashMap<>();
-        for (String name : runtimeContext.getPrePlugins().keySet()) {
-            plugins.put(name, (runtimeContext.getPrePlugins().get(name).init()));
-        }
-        prePlugins = plugins;
-
-        plugins = new HashMap<>();
-        for (String name : runtimeContext.getPostPlugins().keySet()) {
-            plugins.put(name, (runtimeContext.getPostPlugins().get(name).init()));
-        }
-        postPlugins = plugins;
-
-        this.daprClient = daprClient;
+    public UserContext withTopicEvent(TopicEvent event) {
+        this.topicEvent = event;
+        return this;
     }
 
     @Override
     public Error send(String outputName, String data) {
-
+        if (data == null) {
+            return null;
+        }
         Map<String, Component> outputs = runtimeContext.getOutputs();
         if (outputs.isEmpty()) {
             return new Error("no output");
@@ -105,37 +96,30 @@ public class UserContext implements Context {
             return new Error("output " + outputName + " not found");
         }
 
-        String payload = data;
-        // Convert queue binding event into cloud event format to add tracing metadata in the cloud event context.
-        if (isTraceable(output.getComponentType())) {
-        }
-
         if (output.getComponentType().startsWith(OpenFuncTopic)) {
-            daprClient.publishEvent(output.getComponentName(), output.getUri(), payload);
+            daprClient.publishEvent(output.getComponentName(), output.getUri(), data);
         } else if (output.getComponentType().startsWith(OpenFuncBinding)) {
-            daprClient.invokeBinding(output.getComponentName(), output.getOperation(), payload.getBytes(), output.getMetadata()).block();
+            // If a middleware supports both binding and pubsub, then the data send to
+            // binding must be in CloudEvent format, otherwise pubsub cannot parse the data.
+            byte[] payload = data.getBytes();
+            if (MiddlewaresCloudEventFormatReqired.contains(output.getComponentType().substring(OpenFuncBinding.length() + 1))) {
+                CloudEvent event = new CloudEventBuilder()
+                        .withId(UUID.randomUUID().toString())
+                        .withType("dapr.invoke")
+                        .withSource(URI.create("openfunction/invokeBinding"))
+                        .withData(data.getBytes())
+                        .withDataContentType(JsonEventFormat.CONTENT_TYPE)
+                        .withSubject(output.getUri())
+                        .build();
+                payload = new JsonEventFormat().serialize(event);
+            }
+
+            daprClient.invokeBinding(output.getComponentName(), output.getOperation(), payload).block();
         } else {
-            return new Error("unknown output type " + output.getComponentType());
+            return new Error("unsupported output type " + output.getComponentType());
         }
 
         return null;
-    }
-
-    /**
-     * isTraceable Convert queue binding event into cloud event format to add tracing metadata in the cloud event context.
-     *
-     * @param t output type
-     * @return Boolean
-     */
-    private Boolean isTraceable(String t) {
-
-        if (t.startsWith("pubsub")) {
-            return true;
-        }
-
-        // For dapr binding components, let the mapping conditions of the bindingQueueComponents
-        // determine if the tracing metadata can be added.
-        return bindingQueueComponents.get(t);
     }
 
     @Override
@@ -169,18 +153,8 @@ public class UserContext implements Context {
     }
 
     @Override
-    public String getMode() {
-        return runtimeContext.getMode();
-    }
-
-    @Override
     public Out getOut() {
         return out;
-    }
-
-    @Override
-    public String getRuntime() {
-        return runtimeContext.getRuntime();
     }
 
     @Override
@@ -189,61 +163,109 @@ public class UserContext implements Context {
     }
 
     @Override
-    public Map<String, Component> getInputs() {
-        return runtimeContext.getInputs();
-    }
-
-    @Override
     public Map<String, Component> getOutputs() {
         return runtimeContext.getOutputs();
     }
 
-    @Override
-    public String getPodName() {
-        return runtimeContext.getPod();
+    public Map<String, Component> getInputs() {
+        return runtimeContext.getInputs();
     }
 
-    @Override
-    public String getPodNamespace() {
-        return runtimeContext.getNamespace();
+    public Class<?> getFunctionClass() {
+        return function.getClass();
     }
 
-    @Override
-    public Map<String, Plugin> getPrePlugins() {
-        return prePlugins;
-    }
+    private void executePrePlugins() throws Exception {
+        for (String name : runtimeContext.getPrePlugins().keySet()) {
+            Plugin plugin = runtimeContext.getPrePlugins().get(name).init();
+            if (plugin.needToTracing()) {
+                runtimeContext.executeWithTracing(plugin, () -> {
+                    Error error = plugin.execPreHook(UserContext.this);
+                    if (error != null) {
+                        logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
+                    }
 
-    @Override
-    public Map<String, Plugin> getPostPlugins() {
-        return postPlugins;
-    }
-
-    public void setCloudEvent(CloudEvent cloudEvent) {
-        this.cloudEvent = cloudEvent;
-    }
-
-    public void setOut(Out out) {
-        this.out = out;
-    }
-
-    public void executePrePlugins() {
-
-        for (String name : getPrePlugins().keySet()) {
-            Plugin plugin = getPrePlugins().get(name);
-            Error error = plugin.execPreHook(this);
-            if (error != null) {
-                logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
+                    return error;
+                });
+            } else {
+                Error error = plugin.execPreHook(UserContext.this);
+                if (error != null) {
+                    logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
+                }
             }
         }
     }
 
-    public void executePostPlugins() {
-        for (String name : getPostPlugins().keySet()) {
-            Plugin plugin = getPostPlugins().get(name);
-            Error error = plugin.execPostHook(this);
-            if (error != null) {
-                logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
+    private void executePostPlugins() throws Exception {
+        for (String name : runtimeContext.getPostPlugins().keySet()) {
+            Plugin plugin = runtimeContext.getPostPlugins().get(name).init();
+            if (plugin.needToTracing()) {
+                runtimeContext.executeWithTracing(plugin, () -> {
+                    Error error = plugin.execPostHook(UserContext.this);
+                    if (error != null) {
+                        logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
+                    }
+
+                    return error;
+                });
+            } else {
+                Error error = plugin.execPostHook(UserContext.this);
+                if (error != null) {
+                    logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
+                }
             }
         }
+    }
+
+    public void executeFunction(HttpFunction function) throws Exception {
+        this.function = function;
+        executeFunction(() -> {
+            function.service(this.httpRequest, this.httpResponse);
+            return null;
+        });
+    }
+
+    public void executeFunction(CloudEventFunction function, CloudEvent event) throws Exception {
+        this.function = function;
+        this.cloudEvent = event;
+        executeFunction(() -> {
+            Error err = function.accept(UserContext.this, event);
+            if (err == null) {
+                httpResponse.setStatusCode(HttpServletResponse.SC_OK);
+                httpResponse.getOutputStream().write("Success".getBytes());
+            } else {
+                httpResponse.setStatusCode(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                httpResponse.getOutputStream().write(err.getMessage().getBytes());
+            }
+            return null;
+        });
+    }
+
+    public void executeFunction(OpenFunction function, String payload) throws Exception {
+        this.function = function;
+        executeFunction(() -> {
+            out = function.accept(UserContext.this, payload);
+            if (httpResponse != null) {
+                if (out == null || out.getError() == null) {
+                    httpResponse.setStatusCode(HttpServletResponse.SC_OK);
+                    httpResponse.getOutputStream().write("Success".getBytes());
+                } else {
+                    httpResponse.setStatusCode(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    httpResponse.getOutputStream().write(out.getError().getMessage().getBytes());
+                }
+            }
+
+            return out == null ? null : out.getError();
+        });
+    }
+
+    private void executeFunction(Callback callBack) throws Exception {
+        runtimeContext.executeWithTracing(this,
+                () -> {
+                    executePrePlugins();
+                    runtimeContext.executeWithTracing(null, callBack);
+                    executePostPlugins();
+                    return null;
+                });
     }
 }

@@ -45,8 +45,9 @@ containers:
         - name: FUNCTION_TARGET
           value: dev.openfunction.samples.AsyncFunctionImpl
         - name: FUNC_CONTEXT
-          value: "{\"name\":\"sample-binding\",\"version\":\"v2.0.0\",\"inputs\":{\"cron\":{\"uri\":\"cron\",\"componentName\":\"cron-input\",\"componentType\":\"bindings.cron\"}},\"outputs\":{\"sample\":{\"uri\":\"sample-topic\",\"componentName\":\"msg\",\"componentType\":\"bindings.kafka\",}},\"runtime\":\"Async\",\"port\":\"8080\",\"prePlugins\":[\"dev.openfunction.samples.plugins.ExamplePlugin\"],\"postPlugins\":[\"dev.openfunction.samples.plugins.ExamplePlugin\"]}"
           #value: "{\"name\":\"sample-pubsub\",\"version\":\"v2.0.0\",\"inputs\":{\"sub\":{\"uri\":\"sample-topic\",\"componentName\":\"msg\",\"componentType\":\"pubsub.kafka\"}},\"outputs\":{},\"runtime\":\"Async\",\"port\":\"8080\",\"prePlugins\":[\"dev.openfunction.samples.plugin.ExamplePlugin\"],\"postPlugins\":[\"dev.openfunction.samples.plugin.ExamplePlugin\"]}"
+          # function context for binding with tracing
+          #value:"{\"name\":\"sample-binding\",\"version\":\"v2.0.0\",\"inputs\":{\"cron\":{\"componentName\":\"cron-input\",\"componentType\":\"bindings.cron\"}},\"outputs\":{\t\t\t\t\"kafka\":{\t\t\t\t\"uri\":\"topic-test\",\t\t\t\t\"componentName\":\"kafka-output\",\"componentType\":\"bindings.kafka\",\"operation\":\"create\"\t\t\t\t}},\"runtime\":\"Async\",\"port\":\"8080\",\"prePlugins\":[\"dev.openfunction.samples.plugins.ExamplePlugin\"],\"postPlugins\":[\"dev.openfunction.samples.plugins.ExamplePlugin\"],\"pluginsTracing\":{\"enabled\":true,\"provider\":{\"name\":\"opentelemetry\"},\"tags\":{\"func\":\"sample-binding\",\"layer\":\"faas\"},\"baggage\":{\"key\":\"opentelemetry\",\"value\":\"v1.23.0\"}}}"
       portForward: []
       patches:
         - patch: '{"spec":{"template":{"metadata":{"annotations":{"dapr.io/app-id":"cron-input-kafka-output-default", "dapr.io/app-port": "8080", "dapr.io/app-protocol":"grpc","dapr.io/enabled":"true","dapr.io/log-as-json": "true","dapr.io/log-level":"debug"}}}}}'

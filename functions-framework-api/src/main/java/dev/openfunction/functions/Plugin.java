@@ -16,6 +16,8 @@ limitations under the License.
 
 package dev.openfunction.functions;
 
+import java.util.Map;
+
 public interface Plugin {
     /**
      * name return the name of this plugin.
@@ -33,7 +35,7 @@ public interface Plugin {
 
     /**
      * init will create a new plugin, and execute hook in this calling.
-     * If you do not want to use a new plugin to execute hook, just return `nil`.
+     * If you do not want to use a new plugin to execute hook, just return `this`.
      *
      * @return Plugin
      */
@@ -63,4 +65,9 @@ public interface Plugin {
      * @return Object
      */
     Object getField(String fieldName);
+
+    Boolean needToTracing();
+
+    Map<String, String> tagsAddToTracing();
+
 }

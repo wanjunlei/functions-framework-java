@@ -17,6 +17,7 @@ limitations under the License.
 package dev.openfunction.functions;
 
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 public class TopicEvent {
     /**
@@ -60,7 +61,9 @@ public class TopicEvent {
      */
     private final String topic;
 
-    public TopicEvent(String name, String id, String topic, String specversion, String source, String type, String datacontenttype, ByteBuffer data) {
+    private final Map<String, String> extensions;
+
+    public TopicEvent(String name, String id, String topic, String specversion, String source, String type, String datacontenttype, ByteBuffer data, Map<String, String> extensions) {
         this.name = name;
         this.id = id;
         this.topic = topic;
@@ -69,6 +72,7 @@ public class TopicEvent {
         this.type = type;
         this.datacontenttype = datacontenttype;
         this.data = data;
+        this.extensions = extensions;
     }
 
     public String getName() {
@@ -101,5 +105,9 @@ public class TopicEvent {
 
     public String getTopic() {
         return topic;
+    }
+
+    public Map<String, String> getExtensions() {
+        return this.extensions;
     }
 }
