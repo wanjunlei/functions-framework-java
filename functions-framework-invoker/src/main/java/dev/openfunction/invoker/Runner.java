@@ -44,8 +44,6 @@ public class Runner {
     private static final String FunctionContext = "FUNC_CONTEXT";
     private static final String FunctionTarget = "FUNCTION_TARGET";
     private static final String FunctionClasspath = "FUNCTION_CLASSPATH";
-    private static final String SyncRuntime = "Knative";
-    private static final String AsyncRuntime = "Async";
 
     public static void main(String[] args) {
 
@@ -66,9 +64,9 @@ public class Runner {
 
             Runtime runtime;
             Class<?>[] functionClasses = loadTargets(target, functionClassLoader);
-            if (Objects.equals(runtimeContext.getRuntime(), SyncRuntime)) {
+            if (Objects.equals(runtimeContext.getRuntime(), RuntimeContext.SyncRuntime)) {
                 runtime = new SynchronizeRuntime(runtimeContext, functionClasses);
-            } else if (Objects.equals(runtimeContext.getRuntime(), AsyncRuntime)) {
+            } else if (Objects.equals(runtimeContext.getRuntime(), RuntimeContext.AsyncRuntime)) {
                 runtime = new AsynchronousRuntime(runtimeContext, functionClasses);
             } else {
                 throw new Exception("Unknown runtime");

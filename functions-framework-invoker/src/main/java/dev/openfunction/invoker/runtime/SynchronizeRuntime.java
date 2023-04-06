@@ -16,14 +16,16 @@ limitations under the License.
 
 package dev.openfunction.invoker.runtime;
 
-import dev.openfunction.functions.*;
+import dev.openfunction.functions.CloudEventFunction;
+import dev.openfunction.functions.HttpFunction;
+import dev.openfunction.functions.OpenFunction;
+import dev.openfunction.functions.Routable;
 import dev.openfunction.invoker.context.RuntimeContext;
 import dev.openfunction.invoker.context.UserContext;
 import dev.openfunction.invoker.http.HttpRequestImpl;
 import dev.openfunction.invoker.http.HttpResponseImpl;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.message.MessageReader;
-import io.cloudevents.core.provider.EventFormatProvider;
 import io.cloudevents.http.HttpMessageFactory;
 import io.dapr.client.DaprClient;
 import io.dapr.client.DaprClientBuilder;
@@ -35,7 +37,6 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
@@ -56,7 +57,6 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
     public SynchronizeRuntime(RuntimeContext runtimeContext, Class<?>[] functionClasses) {
         this.runtimeContext = runtimeContext;
         this.functionClasses = functionClasses;
-        EventFormatProvider.getInstance().registerFormat(new JsonEventFormat());
     }
 
     @Override
@@ -124,64 +124,27 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
                     }
                 }
 
-                UserContext userContext = new UserContext(runtimeContext, daprClient, reqImpl, respImpl);
+                UserContext userContext = new UserContext(runtimeContext, daprClient).
+                        withHttp(reqImpl, respImpl);
                 if (HttpFunction.class.isAssignableFrom(function.getClass())) {
-                    userContext.executePrePlugins();
-                    ((HttpFunction) function).service(reqImpl, respImpl);
-
-                    if (userContext.getOut() == null) {
-                        userContext.setOut(new Out().setCode(respImpl.getStatusCode()));
-                    }
-
-                    userContext.executePostPlugins();
+                    runtimeContext.executeWithTracing(reqImpl, () -> {
+                                userContext.executeFunction(((HttpFunction) function));
+                                return null;
+                            }
+                    );
                 } else if (CloudEventFunction.class.isAssignableFrom(function.getClass())) {
                     MessageReader messageReader = HttpMessageFactory.createReaderFromMultimap(reqImpl.getHeaders(), reqImpl.getInputStream().readAllBytes());
                     CloudEvent event = messageReader.toEvent();
-                    userContext.setCloudEvent(event);
-
-                    userContext.executePrePlugins();
-                    Error err = ((CloudEventFunction) function).accept(userContext, event);
-
-                    if (userContext.getOut() == null) {
-                        userContext.setOut(new Out().setError(err));
-                    }
-
-                    userContext.executePostPlugins();
-                    if (userContext.getOut() == null) {
-                        userContext.setOut(new Out().setError(err));
-                    }
-                    if (userContext.getOut().getData() == null) {
-                        userContext.getOut().setData(ByteBuffer.wrap(("Success".getBytes())));
-                    }
-
-                    if (err == null) {
-                        respImpl.setStatusCode(HttpServletResponse.SC_OK);
-                    } else {
-                        respImpl.setStatusCode(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                    }
-
-                    respImpl.getOutputStream().write(userContext.getOut().getData().array());
+                    runtimeContext.executeWithTracing(event, () -> {
+                        userContext.executeFunction((CloudEventFunction) function, event);
+                        return null;
+                    });
                 } else if (OpenFunction.class.isAssignableFrom(function.getClass())) {
-                    userContext.executePrePlugins();
-                    Out out = ((OpenFunction) function).accept(userContext, new String(reqImpl.getInputStream().readAllBytes()));
-                    userContext.setOut(out);
-                    userContext.executePostPlugins();
-
-                    if (userContext.getOut() == null) {
-                        userContext.setOut(out);
-                    }
-
-                    if (userContext.getOut().getData() == null) {
-                        userContext.getOut().setData(ByteBuffer.wrap(("Success".getBytes())));
-                    }
-
-                    if (out.getError() == null) {
-                        respImpl.setStatusCode(HttpServletResponse.SC_OK);
-                    } else {
-                        respImpl.setStatusCode(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                    }
-
-                    respImpl.getOutputStream().write(userContext.getOut().getData().array());
+                    runtimeContext.executeWithTracing(reqImpl, () -> {
+                                userContext.executeFunction((OpenFunction) function, new String(reqImpl.getInputStream().readAllBytes()));
+                                return null;
+                            }
+                    );
                 }
             } catch (Throwable t) {
                 logger.log(Level.SEVERE, "Failed to execute function", t);

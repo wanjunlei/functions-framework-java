@@ -8,7 +8,25 @@ spec:
   metadata:
     - name: schedule
       value: "@every 2s"
-
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kafka-output
+spec:
+  type: bindings.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "kafka-server-kafka-brokers:9092"
+    - name: topics
+      value: "topic-test"
+    - name: consumerGroup
+      value: "topic-test"
+    - name: publishTopic
+      value: "topic-test"
+    - name: authRequired
+      value: "false"
 ---
 apiVersion: dapr.io/v1alpha1
 kind: Component
@@ -24,3 +42,7 @@ spec:
       value: "group1"
     - name: authRequired
       value: "false"
+    - name: allowedTopics
+      value: "topic-test,topic-otel-1"
+    - name: consumerID
+      value: "topic-test"
