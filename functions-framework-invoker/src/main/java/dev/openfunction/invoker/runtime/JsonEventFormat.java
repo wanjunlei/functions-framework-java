@@ -18,6 +18,7 @@ package dev.openfunction.invoker.runtime;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.CloudEventData;
@@ -25,6 +26,7 @@ import io.cloudevents.core.data.BytesCloudEventData;
 import io.cloudevents.core.format.EventDeserializationException;
 import io.cloudevents.core.format.EventFormat;
 import io.cloudevents.core.format.EventSerializationException;
+import io.cloudevents.core.v03.CloudEventV03;
 import io.cloudevents.core.v1.CloudEventV1;
 import io.cloudevents.rw.CloudEventDataMapper;
 import org.jetbrains.annotations.NotNull;
@@ -34,16 +36,29 @@ import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class JsonEventFormat implements EventFormat {
 
-    private static final String CONTENT_TYPE = "application/cloudevents+json";
+    public static final String CONTENT_TYPE = "application/cloudevents+json";
 
     private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
     @Override
     public byte[] serialize(@NotNull CloudEvent event) throws EventSerializationException {
-        return GSON.toJson(event).getBytes();
+        JsonObject root = GSON.toJsonTree(event).getAsJsonObject();
+        for (String key : event.getExtensionNames()) {
+            root.add(key, GSON.toJsonTree(event.getExtension(key)));
+        }
+
+        if (root.get("traceparent") != null) {
+            String traceparent = root.get("traceparent").getAsString();
+            if (!Objects.equals(traceparent, "")) {
+                root.add("traceid", GSON.toJsonTree(traceparent));
+            }
+        }
+
+        return root.toString().getBytes();
     }
 
     @Override
@@ -56,44 +71,55 @@ public class JsonEventFormat implements EventFormat {
             URI source = null;
             String type = null;
             String datacontenttype = null;
-            URI dataschema = null;
+            URI schemaurl = null;
             String subject = null;
             OffsetDateTime time = null;
             BytesCloudEventData data = null;
             Map<String, Object> extensions = new HashMap<>();
             for (String key : jsonObject.keySet()) {
+                JsonElement element = jsonObject.get(key);
+                if (element.isJsonNull()) {
+                    continue;
+                }
+
                 switch (key) {
-                    case CloudEventV1.ID:
-                        id = jsonObject.get(key).getAsString();
+                    case CloudEventV03.ID:
+                        id = element.getAsString();
                         break;
-                    case CloudEventV1.SOURCE:
-                        source = new URI(jsonObject.get(key).getAsString());
+                    case CloudEventV03.SOURCE:
+                        source = new URI(element.getAsString());
                         break;
-                    case CloudEventV1.TYPE:
-                        type = jsonObject.get(key).getAsString();
+                    case CloudEventV03.TYPE:
+                        type = element.getAsString();
                         break;
-                    case CloudEventV1.DATACONTENTTYPE:
-                        datacontenttype = jsonObject.get(key).getAsString();
+                    case CloudEventV03.DATACONTENTTYPE:
+                        datacontenttype = element.getAsString();
                         break;
-                    case CloudEventV1.DATASCHEMA:
-                        dataschema = new URI(jsonObject.get(key).getAsString());
+                    case CloudEventV03.SCHEMAURL:
+                        schemaurl = new URI(element.getAsString());
                         break;
                     case CloudEventV1.SUBJECT:
-                        subject = jsonObject.get(key).getAsString();
+                        subject = element.getAsString();
                         break;
                     case CloudEventV1.TIME:
-                        time = OffsetDateTime.parse(jsonObject.get(key).getAsString());
+                        time = OffsetDateTime.parse(element.getAsString());
                         break;
                     case "data":
-                        data = BytesCloudEventData.wrap(jsonObject.get(key).getAsString().getBytes());
+                        data = BytesCloudEventData.wrap(element.getAsString().getBytes());
+                        break;
+                    case "extensions":
+                        JsonObject extensionsObject= element.getAsJsonObject();
+                        for (String extensionKey : extensionsObject.keySet()) {
+                            extensions.put(extensionKey, extensionsObject.get(extensionKey).getAsString());
+                        }
                         break;
                     default:
-                        extensions.put(key, jsonObject.get(key).getAsString());
+                        extensions.put(key, element.getAsString());
                         break;
                 }
             }
 
-            return new CloudEventV1(id, source, type, datacontenttype, dataschema, subject, time, data, extensions);
+            return new CloudEventV03(id, source, type, time, schemaurl, datacontenttype, subject, data, extensions);
         } catch (Exception e) {
             throw new EventDeserializationException(e);
         }

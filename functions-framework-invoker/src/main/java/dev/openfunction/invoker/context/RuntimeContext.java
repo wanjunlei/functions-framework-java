@@ -18,11 +18,14 @@ package dev.openfunction.invoker.context;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import dev.openfunction.functions.Component;
-import dev.openfunction.functions.Plugin;
-import dev.openfunction.invoker.plugins.SkywalkingPlugin;
-import kotlin.Pair;
-import org.eclipse.jetty.util.ArrayUtil;
+import dev.openfunction.functions.*;
+import dev.openfunction.invoker.Callback;
+import dev.openfunction.invoker.runtime.JsonEventFormat;
+import dev.openfunction.invoker.tracing.OpenTelemetryProvider;
+import dev.openfunction.invoker.tracing.SkywalkingProvider;
+import dev.openfunction.invoker.tracing.TracingProvider;
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.provider.EventFormatProvider;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,26 +38,22 @@ public class RuntimeContext {
     private static final Logger logger = Logger.getLogger("dev.openfunction.invoker");
     private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
-    private static final String ModeEnvName = "CONTEXT_MODE";
-    private static final String KubernetesMode = "kubernetes";
-    private static final String SelfHostMode = "self-host";
-    private static final String PodNameEnvName = "POD_NAME";
-    private static final String PodNamespaceEnvName = "POD_NAMESPACE";
+    static final String PodNameEnvName = "POD_NAME";
+    static final String PodNamespaceEnvName = "POD_NAMESPACE";
+    public static final String SyncRuntime = "Knative";
+    public static final String AsyncRuntime = "Async";
+
     private static final String TracingSkywalking = "skywalking";
     private static final String TracingOpentelemetry = "opentelemetry";
 
     private final FunctionContext functionContext;
-    private  String mode;
     private final int port;
-    private String pod;
-    private String namespace;
 
     private Map<String, Plugin> prePlugins;
     private Map<String, Plugin> postPlugins;
-    private Plugin tracingPlugin;
+    private TracingProvider tracingProvider;
 
     public RuntimeContext(String context, ClassLoader classLoader) throws Exception {
-
         functionContext = GSON.getAdapter(FunctionContext.class).fromJson(context);
 
         prePlugins = new HashMap<>();
@@ -62,64 +61,41 @@ public class RuntimeContext {
 
         port = Integer.parseInt(functionContext.getPort());
 
-        mode = System.getenv(ModeEnvName);
-        if (!Objects.equals(mode, SelfHostMode)) {
-            mode = KubernetesMode;
-        }
-
-        if (mode.equals(KubernetesMode)) {
-            pod = System.getenv(PodNameEnvName);
-            if (pod == null || pod.isEmpty()) {
-                throw new Error("environment variable `POD_NAME` not found");
-            }
-
-            namespace = System.getenv(PodNamespaceEnvName);
-            if (pod == null || pod.isEmpty()) {
-                throw new Error("environment variable `POD_NAMESPACE` not found");
-            }
-        }
-
         loadPlugins(classLoader);
+
+        if (functionContext.isTracingEnabled() && functionContext.getPluginsTracing().getProvider() != null) {
+            String provider = functionContext.getPluginsTracing().getProvider().getName();
+            if (!Objects.equals(provider, TracingSkywalking) && !Objects.equals(provider, TracingOpentelemetry)) {
+                throw new IllegalArgumentException("unsupported tracing provider " + provider);
+            }
+
+            switch (provider) {
+                case TracingSkywalking:
+                    tracingProvider = new SkywalkingProvider();
+                case TracingOpentelemetry:
+                    tracingProvider = new OpenTelemetryProvider(functionContext.getPluginsTracing(),
+                            getName(),
+                            System.getenv(RuntimeContext.PodNameEnvName),
+                            System.getenv(RuntimeContext.PodNamespaceEnvName));
+            }
+        }
+
+        EventFormatProvider.getInstance().registerFormat(new JsonEventFormat());
     }
 
     private void loadPlugins(ClassLoader classLoader) {
-
-        String[] prePluginNames = ArrayUtil.add(functionContext.getPrePlugins(), null);
-        String[] postPluginNames = ArrayUtil.add(functionContext.getPostPlugins(), null);
-
-        if (functionContext.isTracingEnabled()) {
-
-            Pair<String, String> provider = functionContext.getTracingProvider();
-            String providerName = provider.component1();
-            if (!Objects.equals(providerName, TracingSkywalking) && !Objects.equals(providerName, TracingOpentelemetry)) {
-                throw new IllegalArgumentException("unknown tracing provider " + provider);
-            }
-
-            prePluginNames = ArrayUtil.addToArray(prePluginNames, providerName, String.class);
-            postPluginNames = ArrayUtil.addToArray(postPluginNames, providerName, String.class);
-
-            Map<String, String> tags = functionContext.getTracingTags();
-            tags.put("func", functionContext.getName());
-            tags.put("instance", pod);
-            tags.put("namespace", namespace);
-
-            tracingPlugin = new SkywalkingPlugin(provider.component2(), tags, functionContext.getTracingBaggage());
-        }
-
-        prePlugins = loadPlugins(classLoader, prePluginNames);
-        postPlugins = loadPlugins(classLoader, postPluginNames);
+        prePlugins = loadPlugins(classLoader, functionContext.getPrePlugins());
+        postPlugins = loadPlugins(classLoader, functionContext.getPostPlugins());
     }
 
     private Map<String, Plugin> loadPlugins(ClassLoader classLoader, String[] pluginNames) {
         Map<String, Plugin> plugins = new HashMap<>();
-
         if (pluginNames == null) {
             return plugins;
         }
 
         for (String name : pluginNames) {
-            if (Objects.equals(name, TracingSkywalking)) {
-                plugins.put(TracingSkywalking, tracingPlugin);
+            if (Objects.equals(name, TracingOpentelemetry) || Objects.equals(name, TracingSkywalking)) {
                 continue;
             }
 
@@ -128,7 +104,7 @@ public class RuntimeContext {
                 Class<? extends Plugin> pluginImplClass = pluginClass.asSubclass(Plugin.class);
                 plugins.put(name, pluginImplClass.getConstructor().newInstance());
             } catch (Exception e) {
-                logger.log(Level.WARNING, "load plugin " + name +" error, " + e.getMessage());
+                logger.log(Level.WARNING, "load plugin " + name + " error, " + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -164,15 +140,32 @@ public class RuntimeContext {
         return functionContext.getOutputs();
     }
 
-    public String getMode() {
-        return mode;
+    public TracingProvider getTracingProvider() {
+        return tracingProvider;
     }
 
-    public String getPod() {
-        return pod;
-    }
-
-    public String getNamespace() {
-        return namespace;
+    public void executeWithTracing(Object obj, Callback callback) throws Exception {
+        if (tracingProvider != null) {
+            if (obj == null) {
+                tracingProvider.executeWithTracing(callback);
+            } else if (obj instanceof HttpRequest) {
+                tracingProvider.executeWithTracing((HttpRequest) obj, callback);
+            } else if (obj instanceof CloudEvent) {
+                tracingProvider.executeWithTracing((CloudEvent) obj, callback);
+            } else if (obj.getClass().isAssignableFrom(TopicEvent.class)) {
+                tracingProvider.executeWithTracing((TopicEvent) obj, callback);
+            } else if (obj.getClass().isAssignableFrom(BindingEvent.class)) {
+                tracingProvider.executeWithTracing((BindingEvent) obj, callback);
+            } else if (obj.getClass().isAssignableFrom(UserContext.class)) {
+                tracingProvider.executeWithTracing((UserContext) obj, callback);
+            } else if (obj instanceof Plugin) {
+                tracingProvider.executeWithTracing((Plugin) obj, callback);
+            }
+        } else {
+            Error error = callback.execute();
+            if (error != null) {
+                logger.log(Level.WARNING, "execute failed, ", error);
+            }
+        }
     }
 }

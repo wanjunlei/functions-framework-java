@@ -16,7 +16,11 @@ limitations under the License.
 
 package dev.openfunction.invoker.runtime;
 
-import dev.openfunction.functions.*;
+import com.google.protobuf.Value;
+import dev.openfunction.functions.BindingEvent;
+import dev.openfunction.functions.Component;
+import dev.openfunction.functions.OpenFunction;
+import dev.openfunction.functions.TopicEvent;
 import dev.openfunction.invoker.context.RuntimeContext;
 import dev.openfunction.invoker.context.UserContext;
 import io.dapr.client.DaprClient;
@@ -27,9 +31,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -127,24 +129,24 @@ public final class AsynchronousRuntime implements Runtime {
         @Override
         public void onBindingEvent(DaprAppCallbackProtos.BindingEventRequest request,
                                    StreamObserver<DaprAppCallbackProtos.BindingEventResponse> responseObserver) {
+            BindingEvent event = new BindingEvent(request.getName(), request.getMetadataMap(), request.getData().asReadOnlyByteBuffer());
+
             try {
-                for (OpenFunction function : functions) {
-                    BindingEvent event = new BindingEvent(request.getName(), request.getMetadataMap(), request.getData().asReadOnlyByteBuffer());
-                    UserContext userContext = new UserContext(runtimeContext, daprClient, event);
-
-                    userContext.executePrePlugins();
-                    Out out = function.accept(userContext, request.getData().toStringUtf8());
-                    userContext.setOut(out);
-                    userContext.executePostPlugins();
-
-                    responseObserver.onNext(DaprAppCallbackProtos.BindingEventResponse.getDefaultInstance());
-                }
+                runtimeContext.executeWithTracing(event, () -> {
+                            for (OpenFunction function : functions) {
+                                new UserContext(runtimeContext, daprClient).
+                                        withBindingEvent(event).
+                                        executeFunction(function, request.getData().toStringUtf8());
+                            }
+                            responseObserver.onNext(DaprAppCallbackProtos.BindingEventResponse.getDefaultInstance());
+                            responseObserver.onCompleted();
+                            return null;
+                        }
+                );
             } catch (Exception e) {
                 logger.log(Level.INFO, "catch exception when execute function " + runtimeContext.getName());
                 e.printStackTrace();
                 responseObserver.onError(e);
-            } finally {
-                responseObserver.onCompleted();
             }
         }
 
@@ -163,33 +165,48 @@ public final class AsynchronousRuntime implements Runtime {
         }
 
         @Override
-        public void onTopicEvent(io.dapr.v1.DaprAppCallbackProtos.TopicEventRequest request,
+        public void onTopicEvent(DaprAppCallbackProtos.TopicEventRequest request,
                                  io.grpc.stub.StreamObserver<io.dapr.v1.DaprAppCallbackProtos.TopicEventResponse> responseObserver) {
-            try {
-                for (OpenFunction function: functions) {
-                    TopicEvent event = new TopicEvent(request.getPubsubName(),
-                            request.getId(),
-                            request.getTopic(),
-                            request.getSpecVersion(),
-                            request.getSource(),
-                            request.getType(),
-                            request.getDataContentType(),
-                            request.getData().asReadOnlyByteBuffer());
-                    UserContext userContext = new UserContext(runtimeContext, daprClient, event);
-                    userContext.executePrePlugins();
-                    Out out = function.accept(userContext, request.getData().toStringUtf8());
-                    userContext.setOut(out);
-                    userContext.executePostPlugins();
+            TopicEvent event = new TopicEvent(request.getPubsubName(),
+                    request.getId(),
+                    request.getTopic(),
+                    request.getSpecVersion(),
+                    request.getSource(),
+                    request.getType(),
+                    request.getDataContentType(),
+                    request.getData().asReadOnlyByteBuffer(),
+                    getExtensions(request));
 
-                    responseObserver.onNext(DaprAppCallbackProtos.TopicEventResponse.getDefaultInstance());
-                }
+            try {
+                runtimeContext.executeWithTracing(event, () -> {
+                            for (OpenFunction function : functions) {
+                                new UserContext(runtimeContext, daprClient).
+                                        withTopicEvent(event).
+                                        executeFunction(function, request.getData().toStringUtf8());
+                            }
+                            responseObserver.onNext(DaprAppCallbackProtos.TopicEventResponse.getDefaultInstance());
+                            responseObserver.onCompleted();
+                            return null;
+                        }
+                );
             } catch (Exception e) {
                 logger.log(Level.INFO, "catch exception when execute function " + runtimeContext.getName());
                 e.printStackTrace();
                 responseObserver.onError(e);
-            } finally {
-                responseObserver.onCompleted();
             }
         }
+    }
+
+    private Map<String, String> getExtensions(DaprAppCallbackProtos.TopicEventRequest request) {
+        Map<String, String> extensions = new HashMap<>();
+        Map<String, Value> fields = request.getExtensions().getFieldsMap();
+        for (String key : fields.keySet()) {
+            Value value = fields.get(key);
+            if (value.hasStringValue()) {
+                extensions.put(key, value.getStringValue());
+            }
+        }
+
+        return extensions;
     }
 }
