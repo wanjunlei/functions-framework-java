@@ -167,6 +167,11 @@ public class UserContext implements Context {
         return runtimeContext.getOutputs();
     }
 
+    @Override
+    public DaprClient getDaprClient() {
+        return daprClient;
+    }
+
     public Map<String, Component> getInputs() {
         return runtimeContext.getInputs();
     }
@@ -232,7 +237,7 @@ public class UserContext implements Context {
             Error err = function.accept(UserContext.this, event);
             if (err == null) {
                 httpResponse.setStatusCode(HttpServletResponse.SC_OK);
-                httpResponse.getOutputStream().write("Success".getBytes());
+                httpResponse.getOutputStream().write(out == null || out.getData() == null ? "Success".getBytes() : out.getData().array());
             } else {
                 httpResponse.setStatusCode(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 httpResponse.getOutputStream().write(err.getMessage().getBytes());
@@ -248,7 +253,7 @@ public class UserContext implements Context {
             if (httpResponse != null) {
                 if (out == null || out.getError() == null) {
                     httpResponse.setStatusCode(HttpServletResponse.SC_OK);
-                    httpResponse.getOutputStream().write("Success".getBytes());
+                    httpResponse.getOutputStream().write(out == null || out.getData() == null ? "Success".getBytes() : out.getData().array());
                 } else {
                     httpResponse.setStatusCode(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     httpResponse.getOutputStream().write(out.getError().getMessage().getBytes());

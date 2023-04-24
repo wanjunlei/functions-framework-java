@@ -4,12 +4,12 @@ package dev.openfunction.functions;
  * An object that can route the specified http request to the specified function.
  */
 public abstract class Routable {
-    private static final String METHOD_DELETE = "DELETE";
-    private static final String METHOD_HEAD = "HEAD";
-    private static final String METHOD_GET = "GET";
-    private static final String METHOD_PATCH = "PATCH";
-    private static final String METHOD_POST = "POST";
-    private static final String METHOD_PUT = "PUT";
+    public static final String METHOD_DELETE = "DELETE";
+    public static final String METHOD_HEAD = "HEAD";
+    public static final String METHOD_GET = "GET";
+    public static final String METHOD_PATCH = "PATCH";
+    public static final String METHOD_POST = "POST";
+    public static final String METHOD_PUT = "PUT";
 
     /**
      * Get the supported http methods.

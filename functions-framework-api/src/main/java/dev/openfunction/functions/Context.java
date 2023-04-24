@@ -17,6 +17,7 @@ limitations under the License.
 package dev.openfunction.functions;
 
 import io.cloudevents.CloudEvent;
+import io.dapr.client.DaprClient;
 
 import java.util.Map;
 
@@ -95,4 +96,13 @@ public interface Context {
      * @return Outputs
      */
     Map<String, Component> getOutputs();
+
+    /**
+     * getDaprClient return a dapr client, so that use user
+     * can call the dapr API directly.
+     * Be carefully, the dapr client maybe null;
+     *
+     * @return Dapr client
+     */
+    DaprClient getDaprClient();
 }

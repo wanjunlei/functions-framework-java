@@ -16,8 +16,7 @@ limitations under the License.
 
 package dev.openfunction.invoker.context;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.openfunction.functions.*;
 import dev.openfunction.invoker.Callback;
 import dev.openfunction.invoker.runtime.JsonEventFormat;
@@ -36,7 +35,6 @@ import java.util.logging.Logger;
 public class RuntimeContext {
 
     private static final Logger logger = Logger.getLogger("dev.openfunction.invoker");
-    private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
     static final String PodNameEnvName = "POD_NAME";
     static final String PodNamespaceEnvName = "POD_NAMESPACE";
@@ -54,7 +52,7 @@ public class RuntimeContext {
     private TracingProvider tracingProvider;
 
     public RuntimeContext(String context, ClassLoader classLoader) throws Exception {
-        functionContext = GSON.getAdapter(FunctionContext.class).fromJson(context);
+        functionContext = new ObjectMapper().readValue(context, FunctionContext.class);
 
         prePlugins = new HashMap<>();
         postPlugins = new HashMap<>();
@@ -138,6 +136,10 @@ public class RuntimeContext {
 
     public Map<String, Component> getOutputs() {
         return functionContext.getOutputs();
+    }
+
+    public Map<String, Component> getStates() {
+        return functionContext.getStates();
     }
 
     public TracingProvider getTracingProvider() {

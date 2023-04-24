@@ -26,6 +26,7 @@ class FunctionContext {
     private String version;
     private Map<String, Component> inputs;
     private Map<String, Component> outputs;
+    private Map<String, Component> states;
     private String runtime;
     private String port;
 
@@ -107,5 +108,13 @@ class FunctionContext {
 
     public boolean isTracingEnabled() {
         return pluginsTracing != null && pluginsTracing.isEnabled();
+    }
+
+    public Map<String, Component> getStates() {
+        return states;
+    }
+
+    public void setStates(Map<String, Component> states) {
+        this.states = states;
     }
 }

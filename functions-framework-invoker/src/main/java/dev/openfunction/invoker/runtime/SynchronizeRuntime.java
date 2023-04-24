@@ -62,7 +62,8 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
     @Override
     public void start() throws Exception {
         if ((runtimeContext.getInputs() != null && !runtimeContext.getInputs().isEmpty()) ||
-                (runtimeContext.getOutputs() != null && !runtimeContext.getOutputs().isEmpty())) {
+                (runtimeContext.getOutputs() != null && !runtimeContext.getOutputs().isEmpty()) ||
+                (runtimeContext.getStates() != null && !runtimeContext.getStates().isEmpty())) {
             daprClient = new DaprClientBuilder().build();
             daprClient.waitForSidecar(Runtime.WaitDaprSidecarTimeout);
         }
