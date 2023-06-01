@@ -98,6 +98,13 @@ public interface Context {
     Map<String, Component> getOutputs();
 
     /**
+     * getStates returns the states of function.
+     *
+     * @return states
+     */
+    Map<String, Component> getStates();
+
+    /**
      * getDaprClient return a dapr client, so that use user
      * can call the dapr API directly.
      * Be carefully, the dapr client maybe null;
