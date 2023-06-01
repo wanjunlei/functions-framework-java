@@ -168,6 +168,11 @@ public class UserContext implements Context {
     }
 
     @Override
+    public Map<String, Component> getStates() {
+        return runtimeContext.getStates();
+    }
+
+    @Override
     public DaprClient getDaprClient() {
         return daprClient;
     }
