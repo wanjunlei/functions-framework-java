@@ -27,12 +27,23 @@ class FunctionContext {
     private Map<String, Component> inputs;
     private Map<String, Component> outputs;
     private Map<String, Component> states;
+    @Deprecated
     private String runtime;
-    private String port;
+    @Deprecated
+    private String port = "8080";
 
+    @Deprecated
     private String[] prePlugins;
+    @Deprecated
     private String[] postPlugins;
+    @Deprecated
     private TracingConfig pluginsTracing;
+
+    private String[] preHooks;
+    private String[] postHooks;
+    private TracingConfig tracing;
+
+    private Triggers triggers;
 
     public String getName() {
         return name;
@@ -75,39 +86,56 @@ class FunctionContext {
     }
 
     public String getPort() {
-        return port;
+        if (triggers != null && triggers.http != null) {
+            return triggers.http.port;
+        } else {
+            return port;
+        }
     }
 
+    @Deprecated
     public void setPort(String port) {
         this.port = port;
     }
 
+    @Deprecated
     public String[] getPrePlugins() {
         return prePlugins;
     }
 
+    @Deprecated
     public void setPrePlugins(String[] prePlugins) {
         this.prePlugins = prePlugins;
     }
 
+    @Deprecated
     public String[] getPostPlugins() {
         return postPlugins;
     }
 
+    @Deprecated
     public void setPostPlugins(String[] postPlugins) {
         this.postPlugins = postPlugins;
     }
 
+    @Deprecated
     public TracingConfig getPluginsTracing() {
         return pluginsTracing;
     }
 
+    @Deprecated
     public void setPluginsTracing(TracingConfig pluginsTracing) {
         this.pluginsTracing = pluginsTracing;
     }
 
     public boolean isTracingEnabled() {
-        return pluginsTracing != null && pluginsTracing.isEnabled();
+        if (tracing != null ) {
+            return tracing.isEnabled();
+        } else if (pluginsTracing != null) {
+            return pluginsTracing.isEnabled();
+        } else {
+            return false;
+        }
     }
 
     public Map<String, Component> getStates() {
@@ -116,5 +144,110 @@ class FunctionContext {
 
     public void setStates(Map<String, Component> states) {
         this.states = states;
+    }
+
+    public String[] getPreHooks() {
+        return preHooks;
+    }
+
+    public void setPreHooks(String[] preHooks) {
+        this.preHooks = preHooks;
+    }
+
+    public String[] getPostHooks() {
+        return postHooks;
+    }
+
+    public void setPostHooks(String[] postHooks) {
+        this.postHooks = postHooks;
+    }
+
+    public TracingConfig getTracing() {
+        return tracing;
+    }
+
+    public void setTracing(TracingConfig tracing) {
+        this.tracing = tracing;
+    }
+
+    public Triggers getTriggers() {
+        return triggers;
+    }
+
+    public void setTriggers(Triggers triggers) {
+        this.triggers = triggers;
+    }
+
+    static class Triggers {
+        private HttpTrigger http;
+        private DaprTrigger[] dapr;
+
+        public HttpTrigger getHttp() {
+            return http;
+        }
+
+        public void setHttp(HttpTrigger http) {
+            this.http = http;
+        }
+
+        public DaprTrigger[] getDapr() {
+            return dapr;
+        }
+
+        public void setDapr(DaprTrigger[] dapr) {
+            this.dapr = dapr;
+        }
+    }
+
+    static class HttpTrigger {
+        private String port;
+
+
+        public String getPort() {
+            return port;
+        }
+
+        public void setPort(String port) {
+            this.port = port;
+        }
+    }
+
+    static class DaprTrigger {
+        private String name;
+        private String type;
+        private String topic;
+        private String inputName;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getTopic() {
+            return topic;
+        }
+
+        public void setTopic(String topic) {
+            this.topic = topic;
+        }
+
+        public String getInputName() {
+            return inputName;
+        }
+
+        public void setInputName(String inputName) {
+            this.inputName = inputName;
+        }
     }
 }

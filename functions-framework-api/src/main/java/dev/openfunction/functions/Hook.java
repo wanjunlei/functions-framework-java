@@ -18,8 +18,7 @@ package dev.openfunction.functions;
 
 import java.util.Map;
 
-@Deprecated
-public interface Plugin {
+public interface Hook {
     /**
      * name return the name of this plugin.
      *
@@ -40,35 +39,17 @@ public interface Plugin {
      *
      * @return Plugin
      */
-    Plugin init();
-
+    Hook init();
 
     /**
-     * execPreHook executes a hook before the function called.
+     * execute executes the hook.
      *
      * @param ctx Runtime context
      * @return error
      */
-    Error execPreHook(Context ctx);
-
-    /**
-     * execPreHook executes a hook after the function called.
-     *
-     * @param ctx Runtime context
-     * @return error
-     */
-    Error execPostHook(Context ctx);
-
-    /**
-     * get return the value of the fieldName`
-     *
-     * @param fieldName Name of member
-     * @return Object
-     */
-    Object getField(String fieldName);
+    Error execute(Context ctx);
 
     Boolean needToTracing();
 
     Map<String, String> tagsAddToTracing();
-
 }

@@ -32,6 +32,7 @@ public interface Context {
      * @param data       Data String
      * @return Error
      */
+    @Deprecated
     Error send(String outputName, String data);
 
     /**
@@ -91,6 +92,13 @@ public interface Context {
     String getHttpPattern();
 
     /**
+     * getInputs returns the inputs of function.
+     *
+     * @return Inputs
+     */
+    Map<String, Component> getInputs();
+
+    /**
      * getOutputs returns the Outputs of function.
      *
      * @return Outputs
@@ -112,4 +120,6 @@ public interface Context {
      * @return Dapr client
      */
     DaprClient getDaprClient();
+
+    CloudEvent packageAsCloudevent(String payload);
 }

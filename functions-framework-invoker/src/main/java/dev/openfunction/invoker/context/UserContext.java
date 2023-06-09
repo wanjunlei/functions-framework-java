@@ -18,7 +18,7 @@ package dev.openfunction.invoker.context;
 
 import dev.openfunction.functions.*;
 import dev.openfunction.invoker.Callback;
-import dev.openfunction.invoker.runtime.JsonEventFormat;
+import dev.openfunction.invoker.JsonEventFormat;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.v03.CloudEventBuilder;
 import io.dapr.client.DaprClient;
@@ -33,17 +33,14 @@ public class UserContext implements Context {
 
     private static final Logger logger = Logger.getLogger("dev.openfunction.invoker");
 
-    public static final String OpenFuncBinding = "bindings";
-    public static final String OpenFuncTopic = "pubsub";
-
-    private static final Set<String> MiddlewaresCloudEventFormatReqired = Set.of(
-            "kafka",
-            "kubemq",
-            "mqtt3",
-            "rabbitmq",
-            "redis",
-            "gcp.pubsub",
-            "azure.eventhubs"
+    private static final Set<String> MiddlewaresCloudEventFormatRequired = Set.of(
+            "bindings.kafka",
+            "bindings.kubemq",
+            "bindings.mqtt3",
+            "bindings.rabbitmq",
+            "bindings.redis",
+            "bindings.gcp.pubsub",
+            "bindings.azure.eventhubs"
     );
 
     private final RuntimeContext runtimeContext;
@@ -82,11 +79,12 @@ public class UserContext implements Context {
     }
 
     @Override
+    @Deprecated
     public Error send(String outputName, String data) {
         if (data == null) {
             return null;
         }
-        Map<String, Component> outputs = runtimeContext.getOutputs();
+        Map<String, Component> outputs = runtimeContext.getFunctionContext().getOutputs();
         if (outputs.isEmpty()) {
             return new Error("no output");
         }
@@ -96,21 +94,14 @@ public class UserContext implements Context {
             return new Error("output " + outputName + " not found");
         }
 
-        if (output.getComponentType().startsWith(OpenFuncTopic)) {
-            daprClient.publishEvent(output.getComponentName(), output.getUri(), data);
-        } else if (output.getComponentType().startsWith(OpenFuncBinding)) {
+        if (output.isPubsub()) {
+            daprClient.publishEvent(output.getComponentName(), output.getTopic(), data);
+        } else if (output.isBinding()) {
             // If a middleware supports both binding and pubsub, then the data send to
             // binding must be in CloudEvent format, otherwise pubsub cannot parse the data.
             byte[] payload = data.getBytes();
-            if (MiddlewaresCloudEventFormatReqired.contains(output.getComponentType().substring(OpenFuncBinding.length() + 1))) {
-                CloudEvent event = new CloudEventBuilder()
-                        .withId(UUID.randomUUID().toString())
-                        .withType("dapr.invoke")
-                        .withSource(URI.create("openfunction/invokeBinding"))
-                        .withData(data.getBytes())
-                        .withDataContentType(JsonEventFormat.CONTENT_TYPE)
-                        .withSubject(output.getUri())
-                        .build();
+            if (MiddlewaresCloudEventFormatRequired.contains(output.getComponentType())) {
+                CloudEvent event = packageAsCloudevent(data);
                 payload = new JsonEventFormat().serialize(event);
             }
 
@@ -149,7 +140,7 @@ public class UserContext implements Context {
 
     @Override
     public String getName() {
-        return runtimeContext.getName();
+        return runtimeContext.getFunctionContext().getName();
     }
 
     @Override
@@ -164,12 +155,12 @@ public class UserContext implements Context {
 
     @Override
     public Map<String, Component> getOutputs() {
-        return runtimeContext.getOutputs();
+        return runtimeContext.getFunctionContext().getOutputs();
     }
 
     @Override
     public Map<String, Component> getStates() {
-        return runtimeContext.getStates();
+        return runtimeContext.getFunctionContext().getStates();
     }
 
     @Override
@@ -177,6 +168,18 @@ public class UserContext implements Context {
         return daprClient;
     }
 
+    @Override
+    public CloudEvent packageAsCloudevent(String payload) {
+        return new CloudEventBuilder()
+                .withId(UUID.randomUUID().toString())
+                .withType("dapr.invoke")
+                .withSource(URI.create("openfunction/invokeBinding"))
+                .withData(payload.getBytes())
+                .withDataContentType(JsonEventFormat.CONTENT_TYPE)
+                .build();
+    }
+
+    @Override
     public Map<String, Component> getInputs() {
         return runtimeContext.getInputs();
     }
@@ -185,44 +188,67 @@ public class UserContext implements Context {
         return function.getClass();
     }
 
-    private void executePrePlugins() throws Exception {
-        for (String name : runtimeContext.getPrePlugins().keySet()) {
-            Plugin plugin = runtimeContext.getPrePlugins().get(name).init();
-            if (plugin.needToTracing()) {
-                runtimeContext.executeWithTracing(plugin, () -> {
-                    Error error = plugin.execPreHook(UserContext.this);
-                    if (error != null) {
-                        logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
-                    }
+    private void executeHooks(boolean pre) throws Exception {
+        Map<String, Object> hooks;
+        if (pre) {
+            hooks = runtimeContext.getPreHooks();
+        } else {
+            hooks = runtimeContext.getPostHooks();
+        }
+        for (String name : hooks.keySet()) {
+            Object obj = hooks.get(name);
+            if (Hook.class.isAssignableFrom(obj.getClass())) {
+                executeHook(((Hook) obj).init());
+            }
 
-                    return error;
-                });
-            } else {
-                Error error = plugin.execPreHook(UserContext.this);
-                if (error != null) {
-                    logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
-                }
+            if (Plugin.class.isAssignableFrom(obj.getClass())) {
+                executePlugin(((Plugin) obj).init(), pre);
             }
         }
     }
 
-    private void executePostPlugins() throws Exception {
-        for (String name : runtimeContext.getPostPlugins().keySet()) {
-            Plugin plugin = runtimeContext.getPostPlugins().get(name).init();
-            if (plugin.needToTracing()) {
-                runtimeContext.executeWithTracing(plugin, () -> {
-                    Error error = plugin.execPostHook(UserContext.this);
-                    if (error != null) {
-                        logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
-                    }
-
-                    return error;
-                });
-            } else {
-                Error error = plugin.execPostHook(UserContext.this);
+    private void executePlugin(Plugin plugin, boolean pre) throws Exception {
+        if (plugin.needToTracing()) {
+            runtimeContext.executeWithTracing(plugin, () -> {
+                Error error;
+                if (pre) {
+                    error = plugin.execPreHook(UserContext.this);
+                } else {
+                    error = plugin.execPostHook(UserContext.this);
+                }
                 if (error != null) {
                     logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
                 }
+
+                return error;
+            });
+        } else {
+            Error error;
+            if (pre) {
+                error = plugin.execPreHook(UserContext.this);
+            } else {
+                error = plugin.execPostHook(UserContext.this);
+            }
+            if (error != null) {
+                logger.log(Level.SEVERE, "execute plugin " + plugin.name() + ":" + plugin.version() + " error", error);
+            }
+        }
+    }
+
+    private void executeHook(Hook hook) throws Exception {
+        if (hook.needToTracing()) {
+            runtimeContext.executeWithTracing(hook, () -> {
+                Error error = hook.execute(UserContext.this);
+                if (error != null) {
+                    logger.log(Level.SEVERE, "execute hook " + hook.name() + ":" + hook.version() + " error", error);
+                }
+
+                return error;
+            });
+        } else {
+            Error error = hook.execute(UserContext.this);
+            if (error != null) {
+                logger.log(Level.SEVERE, "execute hook " + hook.name() + ":" + hook.version() + " error", error);
             }
         }
     }
@@ -272,9 +298,9 @@ public class UserContext implements Context {
     private void executeFunction(Callback callBack) throws Exception {
         runtimeContext.executeWithTracing(this,
                 () -> {
-                    executePrePlugins();
+                    executeHooks(true);
                     runtimeContext.executeWithTracing(null, callBack);
-                    executePostPlugins();
+                    executeHooks(false);
                     return null;
                 });
     }

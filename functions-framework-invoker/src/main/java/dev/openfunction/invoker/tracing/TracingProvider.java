@@ -1,9 +1,6 @@
 package dev.openfunction.invoker.tracing;
 
-import dev.openfunction.functions.BindingEvent;
-import dev.openfunction.functions.HttpRequest;
-import dev.openfunction.functions.Plugin;
-import dev.openfunction.functions.TopicEvent;
+import dev.openfunction.functions.*;
 import dev.openfunction.invoker.Callback;
 import dev.openfunction.invoker.context.UserContext;
 import io.cloudevents.CloudEvent;
@@ -22,6 +19,8 @@ public interface TracingProvider {
     void executeWithTracing(Callback callback)throws Exception;
 
     void executeWithTracing(Plugin plugin, Callback callback)throws Exception;
+
+    void executeWithTracing(Hook hook, Callback callback)throws Exception;
 
     void executeWithTracing(UserContext ctx, Callback callback)throws Exception;
 }

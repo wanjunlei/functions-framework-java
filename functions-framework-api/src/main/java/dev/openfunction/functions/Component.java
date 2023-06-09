@@ -16,20 +16,35 @@ limitations under the License.
 
 package dev.openfunction.functions;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.util.Map;
+import java.util.Objects;
 
 public class Component {
+    private static final String ComponentTypeBinding = "bindings";
+    private static final String ComponentTypePubsub = "pubsub";
+
+    @Deprecated
     private String uri;
+    private String topic;
     private String componentName;
     private String componentType;
     private Map<String, String> metadata;
     private String operation;
 
-
+    @Deprecated
     public String getUri() {
-        return uri;
+        if (!StringUtils.isBlank(uri)) {
+            return uri;
+        } else if (!StringUtils.isBlank(topic)) {
+            return topic;
+        } else {
+            return componentName;
+        }
     }
 
+    @Deprecated
     public void setUri(String uri) {
         this.uri = uri;
     }
@@ -65,5 +80,27 @@ public class Component {
     public void setOperation(String operation) {
         this.operation = operation;
     }
+
+    public String getTopic() {
+        if (StringUtils.isBlank(topic)) {
+            return topic;
+        } else if (StringUtils.isBlank(uri) && !Objects.equals(uri, componentName)) {
+            return uri;
+        } else {
+            return null;
+        }
+    }
+
+    public void setTopic(String topic) {
+        this.topic = topic;
+    }
+
+    public boolean isPubsub() {
+        return componentType.startsWith(ComponentTypePubsub);
+    }
+    public boolean isBinding() {
+        return componentType.startsWith(ComponentTypeBinding);
+    }
+
 }
 

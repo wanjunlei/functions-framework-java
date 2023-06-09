@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dev.openfunction.invoker.runtime;
+package dev.openfunction.invoker.trigger;
 
-public interface Runtime {
+public interface Trigger {
 
     int WaitDaprSidecarTimeout = 60000;
 
