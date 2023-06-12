@@ -82,9 +82,9 @@ public class Component {
     }
 
     public String getTopic() {
-        if (StringUtils.isBlank(topic)) {
+        if (StringUtils.isNotBlank(topic)) {
             return topic;
-        } else if (StringUtils.isBlank(uri) && !Objects.equals(uri, componentName)) {
+        } else if (StringUtils.isNotBlank(uri) && !Objects.equals(uri, componentName)) {
             return uri;
         } else {
             return null;
