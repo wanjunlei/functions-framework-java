@@ -18,9 +18,10 @@ package dev.openfunction.invoker;
 
 
 import dev.openfunction.invoker.context.RuntimeContext;
-import dev.openfunction.invoker.runtime.AsynchronousRuntime;
-import dev.openfunction.invoker.runtime.Runtime;
-import dev.openfunction.invoker.runtime.SynchronizeRuntime;
+import dev.openfunction.invoker.trigger.DaprTrigger;
+import dev.openfunction.invoker.trigger.HttpTrigger;
+import dev.openfunction.invoker.trigger.Trigger;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,6 +43,7 @@ public class Runner {
     private static final Logger logger = Logger.getLogger(Runner.class.getName());
 
     private static final String FunctionContext = "FUNC_CONTEXT";
+    private static final String FunctionContextV1beta2 = "FUNC_CONTEXT_V1BETA2";
     private static final String FunctionTarget = "FUNCTION_TARGET";
     private static final String FunctionClasspath = "FUNCTION_CLASSPATH";
 
@@ -53,26 +55,36 @@ public class Runner {
             }
             String target = System.getenv(FunctionTarget);
 
-            if (!System.getenv().containsKey(FunctionContext)) {
-                throw new Error(FunctionContext + " not set");
+            String functionContext = "";
+            if (System.getenv().containsKey(FunctionContext)) {
+                functionContext = System.getenv(FunctionContext);
             }
-            String functionContext = System.getenv(FunctionContext);
+
+            if (System.getenv().containsKey(FunctionContextV1beta2)) {
+                functionContext = System.getenv(FunctionContextV1beta2);
+            }
+
+            if (StringUtils.isEmpty(functionContext)) {
+                throw new Error("Function context not set");
+            }
 
             String classPath = System.getenv().getOrDefault(FunctionClasspath, System.getProperty("user.dir") + "/*");
             ClassLoader functionClassLoader = new URLClassLoader(classpathToUrls(classPath));
             RuntimeContext runtimeContext = new RuntimeContext(functionContext, functionClassLoader);
 
-            Runtime runtime;
             Class<?>[] functionClasses = loadTargets(target, functionClassLoader);
-            if (Objects.equals(runtimeContext.getRuntime(), RuntimeContext.SyncRuntime)) {
-                runtime = new SynchronizeRuntime(runtimeContext, functionClasses);
-            } else if (Objects.equals(runtimeContext.getRuntime(), RuntimeContext.AsyncRuntime)) {
-                runtime = new AsynchronousRuntime(runtimeContext, functionClasses);
-            } else {
-                throw new Exception("Unknown runtime");
+            Set<Trigger> triggers = new HashSet<>();
+            if (runtimeContext.hasHttpTrigger()) {
+                triggers.add(new HttpTrigger(runtimeContext, functionClasses));
             }
 
-            runtime.start();
+            if (runtimeContext.hasDaprTrigger()) {
+                triggers.add(new DaprTrigger(runtimeContext, functionClasses));
+            }
+
+            for (Trigger trigger : triggers) {
+                trigger.start();
+            }
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Failed to run function", e);
             e.printStackTrace();
@@ -82,7 +94,7 @@ public class Runner {
     private static Class<?>[] loadTargets(String target, ClassLoader functionClassLoader) throws ClassNotFoundException {
         String[] targets = target.split(",");
         Class<?>[] classes = new Class<?>[targets.length];
-        for (int i=0; i < targets.length; i++) {
+        for (int i = 0; i < targets.length; i++) {
             classes[i] = functionClassLoader.loadClass(targets[i]);
         }
 

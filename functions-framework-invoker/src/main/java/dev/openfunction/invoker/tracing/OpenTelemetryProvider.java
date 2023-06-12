@@ -217,17 +217,21 @@ public class OpenTelemetryProvider implements TracingProvider {
     }
 
     @Override
-    public void executeWithTracing(UserContext ctx, Callback callback) throws Exception {
-        SpanKind kind = SpanKind.SERVER;
-        if (ctx.getHttpRequest() == null) {
-            Map<String, Component> inputs = ctx.getInputs();
-            if (inputs != null && !inputs.isEmpty()) {
-                kind = SpanKind.CONSUMER;
-            } else {
-                kind = SpanKind.PRODUCER;
-            }
+    public void executeWithTracing(Hook hook, Callback callback) throws Exception {
+        Map<String, String> tags = new HashMap<>();
+        tags.put("kind", "Hook");
+        tags.put("name", hook.name());
+        tags.put("version", hook.version());
+        if (hook.tagsAddToTracing() != null) {
+            tags.putAll(hook.tagsAddToTracing());
         }
 
+        executeWithTracing(hook.name(), SpanKind.INTERNAL, tags, callback);
+    }
+
+    @Override
+    public void executeWithTracing(UserContext ctx, Callback callback) throws Exception {
+        SpanKind kind = SpanKind.SERVER;
         Map<String, String> tags = new HashMap<>();
         tags.put("function", ctx.getFunctionClass().getName());
 

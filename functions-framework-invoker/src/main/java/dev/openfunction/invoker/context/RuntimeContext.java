@@ -16,19 +16,21 @@ limitations under the License.
 
 package dev.openfunction.invoker.context;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.openfunction.functions.*;
 import dev.openfunction.invoker.Callback;
-import dev.openfunction.invoker.runtime.JsonEventFormat;
+import dev.openfunction.invoker.JsonEventFormat;
 import dev.openfunction.invoker.tracing.OpenTelemetryProvider;
 import dev.openfunction.invoker.tracing.SkywalkingProvider;
 import dev.openfunction.invoker.tracing.TracingProvider;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.provider.EventFormatProvider;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.ArrayUtils;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -38,28 +40,31 @@ public class RuntimeContext {
 
     static final String PodNameEnvName = "POD_NAME";
     static final String PodNamespaceEnvName = "POD_NAMESPACE";
+
+    @Deprecated
     public static final String SyncRuntime = "Knative";
+    @Deprecated
     public static final String AsyncRuntime = "Async";
 
     private static final String TracingSkywalking = "skywalking";
     private static final String TracingOpentelemetry = "opentelemetry";
 
     private final FunctionContext functionContext;
-    private final int port;
 
-    private Map<String, Plugin> prePlugins;
-    private Map<String, Plugin> postPlugins;
     private TracingProvider tracingProvider;
 
+    private Map<String, Object> preHooks;
+    private Map<String, Object> postHooks;
+
     public RuntimeContext(String context, ClassLoader classLoader) throws Exception {
-        functionContext = new ObjectMapper().readValue(context, FunctionContext.class);
+        functionContext = new ObjectMapper().
+                configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).
+                readValue(context, FunctionContext.class);
 
-        prePlugins = new HashMap<>();
-        postPlugins = new HashMap<>();
+        preHooks = new HashMap<>();
+        postHooks = new HashMap<>();
 
-        port = Integer.parseInt(functionContext.getPort());
-
-        loadPlugins(classLoader);
+        loadHooks(classLoader);
 
         if (functionContext.isTracingEnabled() && functionContext.getPluginsTracing().getProvider() != null) {
             String provider = functionContext.getPluginsTracing().getProvider().getName();
@@ -72,7 +77,7 @@ public class RuntimeContext {
                     tracingProvider = new SkywalkingProvider();
                 case TracingOpentelemetry:
                     tracingProvider = new OpenTelemetryProvider(functionContext.getPluginsTracing(),
-                            getName(),
+                            functionContext.getName(),
                             System.getenv(RuntimeContext.PodNameEnvName),
                             System.getenv(RuntimeContext.PodNamespaceEnvName));
             }
@@ -81,69 +86,57 @@ public class RuntimeContext {
         EventFormatProvider.getInstance().registerFormat(new JsonEventFormat());
     }
 
-    private void loadPlugins(ClassLoader classLoader) {
-        prePlugins = loadPlugins(classLoader, functionContext.getPrePlugins());
-        postPlugins = loadPlugins(classLoader, functionContext.getPostPlugins());
-    }
-
-    private Map<String, Plugin> loadPlugins(ClassLoader classLoader, String[] pluginNames) {
-        Map<String, Plugin> plugins = new HashMap<>();
-        if (pluginNames == null) {
-            return plugins;
+    private void loadHooks(ClassLoader classLoader) {
+        String[] preHookNames = functionContext.getPreHooks();
+        if (ArrayUtils.isEmpty(preHookNames)) {
+            preHookNames = functionContext.getPrePlugins();
         }
 
-        for (String name : pluginNames) {
-            if (Objects.equals(name, TracingOpentelemetry) || Objects.equals(name, TracingSkywalking)) {
-                continue;
-            }
+        String[] postHookNames = functionContext.getPostHooks();
+        if (ArrayUtils.isEmpty(postHookNames)) {
+            postHookNames = functionContext.getPostPlugins();
+        }
+        preHooks = loadHooks(classLoader, preHookNames);
+        postHooks = loadHooks(classLoader, postHookNames);
+    }
 
+    private Map<String, Object> loadHooks(ClassLoader classLoader, String[] hookNames) {
+        Map<String, Object> hooks = new HashMap<>();
+        if (ArrayUtils.isEmpty(hookNames)) {
+            return hooks;
+        }
+
+        for (String name : hookNames) {
             try {
-                Class<?> pluginClass = classLoader.loadClass(name);
-                Class<? extends Plugin> pluginImplClass = pluginClass.asSubclass(Plugin.class);
-                plugins.put(name, pluginImplClass.getConstructor().newInstance());
+                Class<?> hookClass = classLoader.loadClass(name);
+                if (Hook.class.isAssignableFrom(hookClass)) {
+                    Class<? extends Hook> hookImplClass = hookClass.asSubclass(Hook.class);
+                    hooks.put(name, hookImplClass.getConstructor().newInstance());
+                }
+
+                if (Plugin.class.isAssignableFrom(hookClass)) {
+                    Class<? extends Plugin> pluginImplClass = hookClass.asSubclass(Plugin.class);
+                    hooks.put(name, pluginImplClass.getConstructor().newInstance());
+                }
             } catch (Exception e) {
-                logger.log(Level.WARNING, "load plugin " + name + " error, " + e.getMessage());
+                logger.log(Level.WARNING, "load hook " + name + " error, " + e.getMessage());
                 e.printStackTrace();
             }
         }
 
-        return plugins;
-    }
-
-    public Map<String, Plugin> getPrePlugins() {
-        return prePlugins;
-    }
-
-    public Map<String, Plugin> getPostPlugins() {
-        return postPlugins;
+        return hooks;
     }
 
     public int getPort() {
-        return port;
+        return Integer.parseInt(functionContext.getPort());
     }
 
     public String getName() {
         return functionContext.getName();
     }
 
-    public String getRuntime() {
-        return functionContext.getRuntime();
-    }
-
     public Map<String, Component> getInputs() {
         return functionContext.getInputs();
-    }
-
-    public Map<String, Component> getOutputs() {
-        return functionContext.getOutputs();
-    }
-
-    public Map<String, Component> getStates() {
-        return functionContext.getStates();
-    }
-
-    public TracingProvider getTracingProvider() {
-        return tracingProvider;
     }
 
     public void executeWithTracing(Object obj, Callback callback) throws Exception {
@@ -162,6 +155,8 @@ public class RuntimeContext {
                 tracingProvider.executeWithTracing((UserContext) obj, callback);
             } else if (obj instanceof Plugin) {
                 tracingProvider.executeWithTracing((Plugin) obj, callback);
+            } else if (obj instanceof Hook) {
+                tracingProvider.executeWithTracing((Hook) obj, callback);
             }
         } else {
             Error error = callback.execute();
@@ -169,5 +164,61 @@ public class RuntimeContext {
                 logger.log(Level.WARNING, "execute failed, ", error);
             }
         }
+    }
+
+    public Map<String, Object> getPreHooks() {
+        return preHooks;
+    }
+
+    public Map<String, Object> getPostHooks() {
+        return postHooks;
+    }
+
+    public boolean hasHttpTrigger() {
+        if (Objects.equals(functionContext.getRuntime(), SyncRuntime)) {
+            return true;
+        }
+
+        return functionContext.getTriggers() != null && functionContext.getTriggers().getHttp() != null;
+    }
+
+    public boolean hasDaprTrigger() {
+        if (Objects.equals(functionContext.getRuntime(), AsyncRuntime)) {
+            return true;
+        }
+
+        return functionContext.getTriggers() != null && ArrayUtils.isEmpty(functionContext.getTriggers().getDapr());
+    }
+
+    public Map<String, Component> getDaprTrigger() {
+        if (Objects.equals(functionContext.getRuntime(), AsyncRuntime)) {
+            return functionContext.getInputs();
+        }
+
+        if (functionContext.getTriggers() != null &&
+                ArrayUtils.isNotEmpty(functionContext.getTriggers().getDapr())) {
+            Map<String, Component> triggers = new HashMap<>();
+            for (FunctionContext.DaprTrigger trigger : functionContext.getTriggers().getDapr()) {
+                Component component = new Component();
+                component.setComponentName(trigger.getName());
+                component.setComponentType(trigger.getType());
+                component.setTopic(trigger.getTopic());
+                triggers.put(component.getComponentName(), component);
+            }
+
+            return triggers;
+        }
+
+        return null;
+    }
+
+    public FunctionContext getFunctionContext() {
+        return functionContext;
+    }
+
+    public boolean needToCreateDaprClient() {
+        return (MapUtils.isNotEmpty(functionContext.getInputs())) ||
+                (MapUtils.isNotEmpty(functionContext.getOutputs())) ||
+                (MapUtils.isNotEmpty(functionContext.getStates()));
     }
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dev.openfunction.invoker.runtime;
+package dev.openfunction.invoker.trigger;
 
 import dev.openfunction.functions.CloudEventFunction;
 import dev.openfunction.functions.HttpFunction;
@@ -45,7 +45,7 @@ import java.util.logging.Logger;
 /**
  * Executes the user's synchronize method.
  */
-public class SynchronizeRuntime extends HttpServlet implements Runtime {
+public class HttpTrigger extends HttpServlet implements Trigger {
     private static final Logger logger = Logger.getLogger("dev.openfunction..invoker");
 
     private final Class<?>[] functionClasses;
@@ -54,18 +54,16 @@ public class SynchronizeRuntime extends HttpServlet implements Runtime {
 
     private DaprClient daprClient;
 
-    public SynchronizeRuntime(RuntimeContext runtimeContext, Class<?>[] functionClasses) {
+    public HttpTrigger(RuntimeContext runtimeContext, Class<?>[] functionClasses) {
         this.runtimeContext = runtimeContext;
         this.functionClasses = functionClasses;
     }
 
     @Override
     public void start() throws Exception {
-        if ((runtimeContext.getInputs() != null && !runtimeContext.getInputs().isEmpty()) ||
-                (runtimeContext.getOutputs() != null && !runtimeContext.getOutputs().isEmpty()) ||
-                (runtimeContext.getStates() != null && !runtimeContext.getStates().isEmpty())) {
+        if (runtimeContext.needToCreateDaprClient()) {
             daprClient = new DaprClientBuilder().build();
-            daprClient.waitForSidecar(Runtime.WaitDaprSidecarTimeout);
+            daprClient.waitForSidecar(Trigger.WaitDaprSidecarTimeout);
         }
 
         ServletContextHandler handler = new ServletContextHandler();

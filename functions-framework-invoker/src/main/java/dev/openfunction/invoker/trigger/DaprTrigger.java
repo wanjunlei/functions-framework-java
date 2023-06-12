@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dev.openfunction.invoker.runtime;
+package dev.openfunction.invoker.trigger;
 
 import com.google.protobuf.Value;
 import dev.openfunction.functions.BindingEvent;
@@ -30,6 +30,7 @@ import io.dapr.v1.DaprAppCallbackProtos;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
+import org.apache.commons.collections.MapUtils;
 
 import java.util.*;
 import java.util.logging.Level;
@@ -38,8 +39,7 @@ import java.util.logging.Logger;
 /**
  * Executes the user's asynchronous function.
  */
-public final class AsynchronousRuntime implements Runtime {
-
+public final class DaprTrigger implements Trigger {
     private static final Logger logger = Logger.getLogger("dev.openfunction.invoker");
 
     private final RuntimeContext runtimeContext;
@@ -48,7 +48,7 @@ public final class AsynchronousRuntime implements Runtime {
 
     private final Service service;
 
-    public AsynchronousRuntime(RuntimeContext runtimeContext, Class<?>[] functionClasses) {
+    public DaprTrigger(RuntimeContext runtimeContext, Class<?>[] functionClasses) {
         this.runtimeContext = runtimeContext;
 
         functions = new ArrayList<>();
@@ -70,10 +70,8 @@ public final class AsynchronousRuntime implements Runtime {
 
     @Override
     public void start() throws Exception {
-        Map<String, Component> inputs = runtimeContext.getInputs();
-
-        if (inputs == null || inputs.isEmpty()) {
-            throw new Error("no inputs defined for the function");
+        if (MapUtils.isEmpty(runtimeContext.getDaprTrigger())) {
+            throw new Error("no dapr trigger defined for the function");
         }
 
         this.service.start(runtimeContext.getPort());
@@ -90,7 +88,6 @@ public final class AsynchronousRuntime implements Runtime {
         private DaprClient daprClient;
 
         public void start(int port) throws Exception {
-
             daprServer = ServerBuilder
                     .forPort(port)
                     .addService(Service.this)
@@ -114,15 +111,15 @@ public final class AsynchronousRuntime implements Runtime {
         public void listInputBindings(com.google.protobuf.Empty request,
                                       io.grpc.stub.StreamObserver<io.dapr.v1.DaprAppCallbackProtos.ListInputBindingsResponse> responseObserver) {
 
-            List<String> inputs = new ArrayList<>();
-            for (String key : runtimeContext.getInputs().keySet()) {
-                Component input = runtimeContext.getInputs().get(key);
-                if (input.getComponentType().startsWith(UserContext.OpenFuncBinding)) {
-                    inputs.add(runtimeContext.getInputs().get(key).getComponentName());
+            List<String> bindings = new ArrayList<>();
+            for (String key : runtimeContext.getDaprTrigger().keySet()) {
+                Component component = runtimeContext.getDaprTrigger().get(key);
+                if (component.isBinding()) {
+                    bindings.add(component.getComponentName());
                 }
             }
 
-            responseObserver.onNext(DaprAppCallbackProtos.ListInputBindingsResponse.newBuilder().addAllBindings(inputs).build());
+            responseObserver.onNext(DaprAppCallbackProtos.ListInputBindingsResponse.newBuilder().addAllBindings(bindings).build());
             responseObserver.onCompleted();
         }
 
@@ -154,10 +151,10 @@ public final class AsynchronousRuntime implements Runtime {
         public void listTopicSubscriptions(com.google.protobuf.Empty request,
                                            io.grpc.stub.StreamObserver<io.dapr.v1.DaprAppCallbackProtos.ListTopicSubscriptionsResponse> responseObserver) {
             List<DaprAppCallbackProtos.TopicSubscription> subscriptions = new ArrayList<>();
-            for (String key : runtimeContext.getInputs().keySet()) {
-                Component input = runtimeContext.getInputs().get(key);
-                if (input.getComponentType().startsWith(UserContext.OpenFuncTopic)) {
-                    subscriptions.add(DaprAppCallbackProtos.TopicSubscription.newBuilder().setTopic(input.getUri()).setPubsubName(input.getComponentName()).build());
+            for (String key : runtimeContext.getDaprTrigger().keySet()) {
+                Component component = runtimeContext.getDaprTrigger().get(key);
+                if (component.isPubsub()) {
+                    subscriptions.add(DaprAppCallbackProtos.TopicSubscription.newBuilder().setTopic(component.getTopic()).setPubsubName(component.getComponentName()).build());
                 }
             }
             responseObserver.onNext(DaprAppCallbackProtos.ListTopicSubscriptionsResponse.newBuilder().addAllSubscriptions(subscriptions).build());
