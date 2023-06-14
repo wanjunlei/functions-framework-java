@@ -1,3 +1,9 @@
+## 1.2.0 / 2023-06-14
+
+### Features
+
+- Add support for OpenFunction v1beta2 API [#15](https://github.com/OpenFunction/functions-framework-java/pull/15).
+
 ## 1.1.0 / 2023-06-01
 
 ### Features

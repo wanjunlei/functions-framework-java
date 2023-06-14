@@ -13,7 +13,7 @@ that supports Maven to create the Maven project. Add this dependency in the
         <dependency>
             <groupId>dev.openfunction.functions</groupId>
             <artifactId>functions-framework-api</artifactId>
-            <version>1.0.0</version>
+            <version>1.2.0</version>
         </dependency>
     </dependencies>
 ```
@@ -23,7 +23,7 @@ Framework dependency in your `build.gradle` project file as follows:
 
 ```groovy
     dependencies {
-        implementation 'dev.openfunction.functions:functions-framework-api:1.0.0'
+        implementation 'dev.openfunction.functions:functions-framework-api:1.2.0'
     }
 
 ```

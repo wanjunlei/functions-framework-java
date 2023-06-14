@@ -187,7 +187,7 @@ public class RuntimeContext {
             return true;
         }
 
-        return functionContext.getTriggers() != null && ArrayUtils.isEmpty(functionContext.getTriggers().getDapr());
+        return functionContext.getTriggers() != null && ArrayUtils.isNotEmpty(functionContext.getTriggers().getDapr());
     }
 
     public Map<String, Component> getDaprTrigger() {

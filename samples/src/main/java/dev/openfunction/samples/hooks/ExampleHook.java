@@ -45,14 +45,14 @@ public class ExampleHook implements Hook {
     public Error execute(Context ctx) {
         String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.XXX").format(new Date());
         if (ctx.getBindingEvent() != null) {
-            System.out.printf("hook %s:%s exec for binding %s at %s, seq %d, function %s", name(), version(), ctx.getBindingEvent().getName(), ts, seq, ctx.getName()).println();
+            System.out.printf("hook %s:%s exec for binding %s at %s, seq %d", name(), version(), ctx.getBindingEvent().getName(), ts, seq).println();
         } else if (ctx.getTopicEvent() != null) {
-            System.out.printf("hook %s:%s exec for pubsub %s at %s, seq %d, function %s", name(), version(), ctx.getTopicEvent().getName(), ts, seq, ctx.getName()).println();
+            System.out.printf("hook %s:%s exec for pubsub %s at %s, seq %d", name(), version(), ctx.getTopicEvent().getName(), ts, seq).println();
         } else if (ctx.getHttpRequest() != null) {
             if (ctx.getCloudEvent() != null) {
-                System.out.printf("hook %s:%s exec for cloudevent function %s at %s, seq %d", name(), version(), ctx.getName(), ts, seq).println();
+                System.out.printf("hook %s:%s exec for cloudevent function at %s, seq %d", name(), version(), ts, seq).println();
             } else {
-                System.out.printf("hook %s:%s exec for http function %s at %s, seq %d", name(), version(), ctx.getName(), ts, seq).println();
+                System.out.printf("hook %s:%s exec for http function at %s, seq %d", name(), version(), ts, seq).println();
             }
         } else {
             System.out.println("unknown function type");

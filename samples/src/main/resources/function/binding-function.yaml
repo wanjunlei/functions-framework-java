@@ -2,12 +2,6 @@ apiVersion: core.openfunction.io/v1beta1
 kind: Function
 metadata:
   name: cron-input-kafka-output
-  annotations:
-    plugins: |
-      pre:
-      - dev.openfunction.samples.plugins.ExamplePlugin
-      post:
-      - dev.openfunction.samples.plugins.ExamplePlugin
 spec:
   version: "v2.0.0"
   image: openfunctiondev/cron-input-kafka-output-java:v1
@@ -27,13 +21,9 @@ spec:
       containers:
         - name: function # DO NOT change this
           imagePullPolicy: IfNotPresent
-    runtime: "async"
-    inputs:
-      - name: cron
-        component: cron
     outputs:
-      - name: sample
-        component: kafka-server
+      - name: kafka-server
+        type: bindings.kafka
         operation: "create"
     bindings:
       cron:
@@ -56,3 +46,12 @@ spec:
             value: "sample-topic"
           - name: authRequired
             value: "false"
+    triggers:
+      dapr:
+        - name: cron
+          type: bindings.cron
+    hooks:
+      post:
+        - dev.openfunction.samples.hooks.ExampleHook
+      pre:
+        - dev.openfunction.samples.hooks.ExampleHook

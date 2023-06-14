@@ -1,19 +1,12 @@
-apiVersion: core.openfunction.io/v1beta1
+apiVersion: core.openfunction.io/v1beta2
 kind: Function
 metadata:
   name: function-cloudevent
-  annotations:
-    plugins: |
-      pre:
-      - dev.openfunction.samples.plugins.ExamplePlugin
-      post:
-      - dev.openfunction.samples.plugins.ExamplePlugin
 spec:
   version: "v2.0.0"
   image: "openfunctiondev/function-cloudevent-java:v1"
   imageCredentials:
     name: push-secret
-  port: 8080 # default to 8080
   build:
     builder: openfunctiondev/builder-java:v2-18
     env:
@@ -28,4 +21,8 @@ spec:
       containers:
         - name: function # DO NOT change this
           imagePullPolicy: IfNotPresent
-    runtime: "knative"
+    hooks:
+      post:
+        - dev.openfunction.samples.hooks.ExampleHook
+      pre:
+        - dev.openfunction.samples.hooks.ExampleHook
